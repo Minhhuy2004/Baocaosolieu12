@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useEffect,
-  useTransition,
   type ErrorInfo,
   type ReactNode,
 } from "react"
@@ -3186,7 +3185,6 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
-  const [isNavigationPending, startNavigation] = useTransition()
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
@@ -3276,7 +3274,7 @@ export default function App() {
 
   const navigateToPage = (nextPage: Page) => {
     if (nextPage !== page) {
-      startNavigation(() => setPage(nextPage))
+      setPage(nextPage)
     }
   }
 
@@ -3418,7 +3416,6 @@ export default function App() {
         {/* Main Content Area */}
         <main
           ref={mainContentRef}
-          aria-busy={isNavigationPending}
           style={{
             flex: 1,
             overflowY: "auto",
@@ -3426,7 +3423,7 @@ export default function App() {
           }}
         >
           <PageErrorBoundary key={page} pageName={page}>
-            <div className="page-transition">
+            <div>
               {page === "dashboard" && (
                 <DashboardPage members={filteredMembers} />
               )}

@@ -20,12 +20,30 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, {
     if (this.state.hasError) {
       return (
         <main
-          aria-hidden="true"
+          role="alert"
           style={{
             minHeight: "100vh",
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+            color: "#475569",
             background: "#eef2f7",
+            textAlign: "center",
           }}
-        />
+        >
+          <div
+            style={{
+              maxWidth: 440,
+              padding: "24px 28px",
+              border: "1px solid #e2e8f0",
+              borderRadius: 12,
+              background: "#fff",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+            }}
+          >
+            Nội dung tạm thời không khả dụng.
+          </div>
+        </main>
       )
     }
 

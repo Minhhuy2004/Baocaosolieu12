@@ -81,9 +81,19 @@ class PageErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <div
-          aria-hidden="true"
-          style={{ minHeight: 320, background: "#f1f5f9" }}
-        />
+          role="alert"
+          style={{
+            minHeight: 320,
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+            color: "#475569",
+            background: "#f1f5f9",
+            textAlign: "center",
+          }}
+        >
+          Không thể hiển thị chức năng này. Vui lòng chọn chức năng khác.
+        </div>
       )
     }
 

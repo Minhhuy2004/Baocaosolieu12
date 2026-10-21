@@ -32,6 +32,23 @@ jobs:
         run: npm ci
       - name: Build site
         run: npm run predeploy
+      - name: Preserve bundles used by cached pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="https://minhhuy2004.github.io/Baocaosolieu12"
+          html="$(curl --fail --silent --show-error "$base_url/")"
+          while IFS= read -r asset_path; do
+            [[ -n "$asset_path" ]] || continue
+            file_path="${asset_path#/Baocaosolieu12/}"
+            mkdir -p "dist/$(dirname "$file_path")"
+            curl --fail --silent --show-error "$base_url$asset_path" \
+              --output "dist/$file_path"
+          done < <(
+            printf '%s' "$html" |
+              grep -oE '/Baocaosolieu12/assets/[^"]+\.(js|css)' |
+              sort -u
+          )
       - name: Include custom domain configuration
         run: cp CNAME dist/CNAME
       - name: Upload site artifact

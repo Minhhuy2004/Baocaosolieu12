@@ -17,6 +17,13 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: emitSourcemaps ? "inline" : false,
       minify: !emitSourcemaps,
+      rolldownOptions: {
+        output: {
+          entryFileNames: "assets/app.js",
+          chunkFileNames: "assets/[name].js",
+          assetFileNames: "assets/[name][extname]",
+        },
+      },
     },
     plugins: [
       react(),
@@ -120,7 +127,6 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
     },
     generateBundle() {
       if (!robotsTxt) return
-
       ;(this as any).emitFile({
         type: "asset",
         fileName: "robots.txt",

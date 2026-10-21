@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "predeploy": "vite build --base=/Baocaosolieu12/",
+    "predeploy": "vite build --base=/",
     "deploy": "gh-pages -d dist",
     "format": "oxfmt"
   },

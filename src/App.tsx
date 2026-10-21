@@ -1,5 +1,7 @@
 import {
   Component,
+  lazy,
+  Suspense,
   useState,
   useMemo,
   useRef,
@@ -9,19 +11,18 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import type { WorkBook } from "xlsx"
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ReferenceLine,
-  Cell,
-} from "recharts"
 import initialData from "./initialData.json"
+
+const DashboardChart = lazy(() =>
+  import("./chart-renderer").then((module) => ({
+    default: module.DashboardChart,
+  })),
+)
+const BieuDoChart = lazy(() =>
+  import("./chart-renderer").then((module) => ({
+    default: module.BieuDoChart,
+  })),
+)
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -528,65 +529,21 @@ function FilterBar({
   )
 }
 
-// ── CUSTOM TOOLTIP ────────────────────────────────────────────────────────────
-
-function ChartTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean
-  payload?: { name: string; value: number; color: string }[]
-  label?: string
-}) {
-  if (!active || !payload?.length) return null
+function ChartLoadingPlaceholder({ height }: { height: number }) {
   return (
     <div
+      role="status"
+      aria-label="Đang tải biểu đồ"
       style={{
-        background: "#111827",
-        border: "1px solid rgba(255,255,255,0.15)",
-        borderRadius: 8,
-        padding: "10px 14px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        height,
+        display: "grid",
+        placeItems: "center",
+        background: "#fff",
+        color: "#64748b",
+        fontSize: 13,
       }}
     >
-      <div
-        style={{
-          fontSize: 12,
-          color: "#9ca3af",
-          marginBottom: 6,
-          fontWeight: 700,
-        }}
-      >
-        {label}
-      </div>
-      {payload.map((p) => (
-        <div
-          key={p.name}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 12,
-            color: "#f9fafb",
-            marginBottom: 2,
-          }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: p.color,
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ color: "#9ca3af" }}>{p.name}:</span>
-          <span className="mono" style={{ fontWeight: 700 }}>
-            {fmt1(p.value)} tỷ
-          </span>
-        </div>
-      ))}
+      Đang tải biểu đồ...
     </div>
   )
 }
@@ -595,6 +552,12 @@ function ChartTooltip({
 
 function DashboardPage({ members }: { members: Member[] }) {
   const [tab, setTab] = useState<"hdv" | "td">("hdv")
+  const [shouldRenderCharts, setShouldRenderCharts] = useState(false)
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setShouldRenderCharts(true), 250)
+    return () => window.clearTimeout(timeoutId)
+  }, [])
 
   const hdvTh = sumMetric(members, "hdv", "th")
   const hdvDk = sumMetric(members, "hdv", "dk")
@@ -751,39 +714,16 @@ function DashboardPage({ members }: { members: Member[] }) {
               Đơn vị tính: tỷ đồng (hiển thị 18 CBKH đầu)
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart
-              data={tab === "hdv" ? barDataHDV : barDataTD}
-              margin={{ left: 0, right: 8 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey={"name" as any}
-                tick={{ fontSize: 11, fill: "#64748b" }}
-                axisLine={false}
-                tickLine={false}
+          {shouldRenderCharts ? (
+            <Suspense fallback={<ChartLoadingPlaceholder height={280} />}>
+              <DashboardChart
+                data={tab === "hdv" ? barDataHDV : barDataTD}
+                actualFill={tab === "hdv" ? "#005855" : "#fdb71a"}
               />
-              <YAxis
-                tick={{
-                  fontSize: 11,
-                  fill: "#64748b",
-                  fontFamily: "JetBrains Mono",
-                }}
-                axisLine={false}
-                tickLine={false}
-                width={48}
-              />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} />
-              <Bar dataKey={"ĐK" as any} fill="#7ecbc9" radius={[3, 3, 0, 0]} />
-              <Bar dataKey={"KH" as any} fill="#006b68" radius={[3, 3, 0, 0]} />
-              <Bar
-                dataKey={"TH" as any}
-                fill={tab === "hdv" ? "#005855" : "#fdb71a"}
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+            </Suspense>
+          ) : (
+            <ChartLoadingPlaceholder height={280} />
+          )}
         </div>
 
         {/* % Hoàn thành Top List */}
@@ -1083,13 +1023,6 @@ function calcWorkingDaysLeft(): number {
     cur.setDate(cur.getDate() + 1)
   }
   return Math.max(count, 1)
-}
-
-/** Màu bar theo mức so với trung bình: đỏ > 150%, vàng > 100%, xanh ≤ 100%. */
-function barColor(val: number, avg: number): string {
-  if (val > avg * 1.5) return "#dc2626"
-  if (val > avg) return "#d97706"
-  return "#059669"
 }
 
 function BieuDoPage({ members, units }: { members: Member[]; units: string[] }) {
@@ -1435,84 +1368,24 @@ function BieuDoPage({ members, units }: { members: Member[]; units: string[] }) 
 
         {/* ── Tab: ĐK / KH / TH ── */}
         {chartType === "compare" && (
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart
+          <Suspense fallback={<ChartLoadingPlaceholder height={340} />}>
+            <BieuDoChart
+              kind="compare"
               data={compareData}
-              margin={{ left: 0, right: 16, bottom: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey={"name" as any}
-                tick={{ fontSize: 11, fill: "#64748b" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{
-                  fontSize: 11,
-                  fill: "#64748b",
-                  fontFamily: "JetBrains Mono",
-                }}
-                axisLine={false}
-                tickLine={false}
-                width={50}
-              />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar
-                dataKey={"ĐK" as any}
-                fill="#7ecbc9"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey={"KH" as any}
-                fill="#006b68"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey={"TH" as any}
-                fill={metric === "hdv" ? "#005855" : "#fdb71a"}
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+              actualFill={metric === "hdv" ? "#005855" : "#fdb71a"}
+            />
+          </Suspense>
         )}
 
         {/* ── Tab: Theo đơn vị ── */}
         {chartType === "unit" && (
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={unitData} margin={{ left: 0, right: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey={"name" as any}
-                tick={{ fontSize: 12, fill: "#64748b", fontWeight: 600 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{
-                  fontSize: 11,
-                  fill: "#64748b",
-                  fontFamily: "JetBrains Mono",
-                }}
-                axisLine={false}
-                tickLine={false}
-                width={50}
-              />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar
-                dataKey={"KH" as any}
-                fill="#7ecbc9"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey={"TH" as any}
-                fill={metric === "hdv" ? "#005855" : "#fdb71a"}
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<ChartLoadingPlaceholder height={340} />}>
+            <BieuDoChart
+              kind="unit"
+              data={unitData}
+              actualFill={metric === "hdv" ? "#005855" : "#fdb71a"}
+            />
+          </Suspense>
         )}
 
         {/* ── Tab: % Hoàn thành ── */}
@@ -1575,157 +1448,38 @@ function BieuDoPage({ members, units }: { members: Member[]; units: string[] }) 
 
         {/* ── Tab: Còn thực hiện (horizontal bar) ── */}
         {chartType === "conth" && (
-          <ResponsiveContainer
-            width="100%"
-            height={Math.max(320, activeConTh.length * 26)}
+          <Suspense
+            fallback={
+              <ChartLoadingPlaceholder
+                height={Math.max(320, activeConTh.length * 26)}
+              />
+            }
           >
-            <BarChart
+            <BieuDoChart
+              kind="conth"
               data={activeConTh}
-              layout="vertical"
-              margin={{
-                left: groupByUnit ? 64 : 44,
-                right: 64,
-                top: 8,
-                bottom: 8,
-              }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#f1f5f9"
-                horizontal={false}
-              />
-              <XAxis
-                type="number"
-                tick={{
-                  fontSize: 11,
-                  fill: "#64748b",
-                  fontFamily: "JetBrains Mono",
-                }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => fmt1(v)}
-              />
-              <YAxis
-                type="category"
-                dataKey={"name" as any}
-                tick={{
-                  fontSize: groupByUnit ? 12 : 10,
-                  fill: "#374151",
-                  fontWeight: 600,
-                }}
-                axisLine={false}
-                tickLine={false}
-                width={groupByUnit ? 62 : 40}
-              />
-              <Tooltip
-                formatter={(v: any) => [`${fmt1(v)} tỷ`, "Còn thực hiện"]}
-              />
-              <ReferenceLine
-                x={avgConTh}
-                stroke="#f59e0b"
-                strokeDasharray="5 3"
-                strokeWidth={2}
-                label={{
-                  value: `TB: ${fmt1(avgConTh)} tỷ`,
-                  position: "insideTopRight",
-                  fontSize: 11,
-                  fill: "#b45309",
-                  fontWeight: 700,
-                }}
-              />
-              <Bar
-                dataKey={"Còn TH" as any}
-                radius={[0, 4, 4, 0]}
-                maxBarSize={20}
-              >
-                {activeConTh.map((entry, idx) => (
-                  <Cell
-                    key={`conth-cell-${idx}`}
-                    fill={barColor(entry["Còn TH"], avgConTh)}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              groupByUnit={groupByUnit}
+              average={avgConTh}
+            />
+          </Suspense>
         )}
 
         {/* ── Tab: Phấn đấu/ngày (horizontal bar) ── */}
         {chartType === "perday" && (
-          <ResponsiveContainer
-            width="100%"
-            height={Math.max(320, activePerDay.length * 26)}
+          <Suspense
+            fallback={
+              <ChartLoadingPlaceholder
+                height={Math.max(320, activePerDay.length * 26)}
+              />
+            }
           >
-            <BarChart
+            <BieuDoChart
+              kind="perday"
               data={activePerDay}
-              layout="vertical"
-              margin={{
-                left: groupByUnit ? 64 : 44,
-                right: 80,
-                top: 8,
-                bottom: 8,
-              }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#f1f5f9"
-                horizontal={false}
-              />
-              <XAxis
-                type="number"
-                tick={{
-                  fontSize: 11,
-                  fill: "#64748b",
-                  fontFamily: "JetBrains Mono",
-                }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => v.toFixed(3)}
-              />
-              <YAxis
-                type="category"
-                dataKey={"name" as any}
-                tick={{
-                  fontSize: groupByUnit ? 12 : 10,
-                  fill: "#374151",
-                  fontWeight: 600,
-                }}
-                axisLine={false}
-                tickLine={false}
-                width={groupByUnit ? 62 : 40}
-              />
-              <Tooltip
-                formatter={(v: any) => [
-                  `${Number(v).toFixed(4)} tỷ/ngày`,
-                  "Cần đạt mỗi ngày",
-                ]}
-              />
-              <ReferenceLine
-                x={avgPerDay}
-                stroke="#f59e0b"
-                strokeDasharray="5 3"
-                strokeWidth={2}
-                label={{
-                  value: `TB: ${avgPerDay.toFixed(3)} tỷ/ngày`,
-                  position: "insideTopRight",
-                  fontSize: 11,
-                  fill: "#b45309",
-                  fontWeight: 700,
-                }}
-              />
-              <Bar
-                dataKey={"Tỷ/ngày" as any}
-                radius={[0, 4, 4, 0]}
-                maxBarSize={20}
-              >
-                {activePerDay.map((entry, idx) => (
-                  <Cell
-                    key={`perday-cell-${idx}`}
-                    fill={barColor(entry["Tỷ/ngày"], avgPerDay)}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              groupByUnit={groupByUnit}
+              average={avgPerDay}
+            />
+          </Suspense>
         )}
       </div>
 

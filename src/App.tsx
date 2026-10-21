@@ -3057,7 +3057,7 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
           <span>BIDV</span>
           {/* Biểu tượng hoa mai vàng BIDV */}
           <img
-            src="/bidv-flower.png"
+            src={`${import.meta.env.BASE_URL}bidv-flower.png`}
             alt="BIDV"
             style={{ width: 20, height: 20, objectFit: "contain" }}
           />

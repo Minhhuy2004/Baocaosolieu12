@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
-import * as XLSX from "xlsx"
+import type { WorkBook } from "xlsx"
 import {
   BarChart,
   Bar,
@@ -154,9 +154,10 @@ const getMemberId = (member: Member, index: number) =>
 
 // ── ROBUST EXCEL PARSER ───────────────────────────────────────────────────────
 
-export function parseExcelWorkbook(
-  workbook: XLSX.WorkBook,
-): { members: Member[]; rows: ReportRow[] } {
+export async function parseExcelWorkbook(
+  workbook: WorkBook,
+): Promise<{ members: Member[]; rows: ReportRow[] }> {
+  const XLSX = await import("xlsx")
   const importedMembers: Member[] = []
   const importedRows: ReportRow[] = []
 
@@ -3215,9 +3216,10 @@ export default function App() {
     if (!file) return
 
     try {
+      const XLSX = await import("xlsx")
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: "array" })
-      const parsed = parseExcelWorkbook(workbook)
+      const parsed = await parseExcelWorkbook(workbook)
 
       if (!parsed.members.length) {
         throw new Error(

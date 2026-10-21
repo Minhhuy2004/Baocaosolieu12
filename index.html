@@ -16,14 +16,10 @@
         var root = document.getElementById("root")
         if (!root || root.dataset.startupError) return
         root.dataset.startupError = "true"
-        var reloadUrl = location.pathname + "?refresh=" + Date.now()
         root.innerHTML =
           '<main style="font-family:Arial,sans-serif;max-width:560px;margin:12vh auto;padding:32px;color:#1f2937;text-align:center">' +
           "<h1>Không tải được ứng dụng</h1>" +
-          "<p>Chrome có thể đang giữ phiên bản cũ. Hãy tải lại ứng dụng bằng nút bên dưới.</p>" +
-          '<a href="' +
-          reloadUrl +
-          '" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#006b54;color:#fff;text-decoration:none;font-weight:700">Tải lại ứng dụng</a>' +
+          "<p>Vui lòng thử lại sau.</p>" +
           "</main>"
       }
       window.addEventListener(

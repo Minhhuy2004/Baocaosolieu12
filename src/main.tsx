@@ -30,21 +30,7 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, {
           }}
         >
           <h1>Ứng dụng gặp lỗi khi hiển thị</h1>
-          <p>Hãy tải lại trang để sử dụng phiên bản mới nhất.</p>
-          <a
-            href={`${window.location.pathname}?refresh=${Date.now()}`}
-            style={{
-              display: "inline-block",
-              padding: "12px 20px",
-              borderRadius: 8,
-              background: "#006b54",
-              color: "#fff",
-              fontWeight: 700,
-              textDecoration: "none",
-            }}
-          >
-            Tải lại ứng dụng
-          </a>
+          <p>Vui lòng thử lại sau.</p>
         </main>
       )
     }

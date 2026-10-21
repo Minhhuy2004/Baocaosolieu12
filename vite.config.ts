@@ -19,9 +19,9 @@ export default defineConfig(({ mode }) => {
       minify: !emitSourcemaps,
       rolldownOptions: {
         output: {
-          entryFileNames: "assets/app.js",
-          chunkFileNames: "assets/[name].js",
-          assetFileNames: "assets/[name][extname]",
+          entryFileNames: "assets/[name]-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
+          assetFileNames: "assets/[name]-[hash][extname]",
         },
       },
     },

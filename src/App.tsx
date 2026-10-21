@@ -1,4 +1,13 @@
-import { useState, useMemo, useRef, useEffect, useTransition } from "react"
+import {
+  Component,
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useTransition,
+  type ErrorInfo,
+  type ReactNode,
+} from "react"
 import { createPortal } from "react-dom"
 import * as XLSX from "xlsx"
 import {
@@ -49,6 +58,38 @@ export type ReportRow = {
 }
 
 type Page = "dashboard" | "bieudo" | "solieu" | "xuatpdf"
+
+class PageErrorBoundary extends Component<
+  { children: ReactNode; pageName: Page },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(
+      `Page rendering failed: ${this.props.pageName}.`,
+      error,
+      info.componentStack,
+    )
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          aria-hidden="true"
+          style={{ minHeight: 320, background: "#f1f5f9" }}
+        />
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 // ── FORMATTERS ────────────────────────────────────────────────────────────────
 
@@ -3384,24 +3425,26 @@ export default function App() {
             background: page === "xuatpdf" ? "#f8fafc" : "#f1f5f9",
           }}
         >
-          <div key={page} className="page-transition">
-            {page === "dashboard" && (
-              <DashboardPage members={filteredMembers} />
-            )}
-            {page === "bieudo" && (
-              <BieuDoPage members={filteredMembers} units={units} />
-            )}
-            {page === "solieu" && (
-              <SoLieuPage members={filteredMembers} units={units} />
-            )}
-            {page === "xuatpdf" && (
-              <XuatPDFPage
-                rows={sourceRows}
-                sourceName={sourceName}
-                onUploadExcel={handleExcelUpload}
-              />
-            )}
-          </div>
+          <PageErrorBoundary key={page} pageName={page}>
+            <div className="page-transition">
+              {page === "dashboard" && (
+                <DashboardPage members={filteredMembers} />
+              )}
+              {page === "bieudo" && (
+                <BieuDoPage members={filteredMembers} units={units} />
+              )}
+              {page === "solieu" && (
+                <SoLieuPage members={filteredMembers} units={units} />
+              )}
+              {page === "xuatpdf" && (
+                <XuatPDFPage
+                  rows={sourceRows}
+                  sourceName={sourceName}
+                  onUploadExcel={handleExcelUpload}
+                />
+              )}
+            </div>
+          </PageErrorBoundary>
         </main>
       </div>
     </div>

@@ -36,13 +36,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base_url="https://minhhuy2004.github.io/Baocaosolieu12"
-          html="$(curl --fail --silent --show-error "$base_url/")"
+          origin="https://minhhuy2004.github.io"
+          site_path="/Baocaosolieu12"
+          html="$(curl --fail --silent --show-error "$origin$site_path/")"
           while IFS= read -r asset_path; do
             [[ -n "$asset_path" ]] || continue
-            file_path="${asset_path#/Baocaosolieu12/}"
+            file_path="${asset_path#"$site_path"/}"
             mkdir -p "dist/$(dirname "$file_path")"
-            curl --fail --silent --show-error "$base_url$asset_path" \
+            curl --fail --silent --show-error "$origin$asset_path" \
               --output "dist/$file_path"
           done < <(
             printf '%s' "$html" |

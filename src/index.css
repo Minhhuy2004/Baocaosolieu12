@@ -1,0 +1,164 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #eef2f7;
+  color: #111827;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px !important;
+}
+
+button { font-family: 'Be Vietnam Pro', sans-serif; }
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+.page-transition {
+  animation: page-enter 180ms ease-out both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+}
+
+/* ── TOP-LEVEL @PAGE RULE (Default Portrait orientation) ── */
+@page {
+  size: A4 portrait;
+  margin: 3mm;
+}
+
+@page :left {
+  size: A4 portrait;
+}
+
+@page :right {
+  size: A4 portrait;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+#root {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Print portal: ẩn trên màn hình, chỉ hiện khi in */
+.print-portal {
+  display: none;
+}
+
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body, #root {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Ẩn toàn bộ UI app khi in — chỉ in nội dung từ print portal */
+  #root {
+    display: none !important;
+  }
+
+  /* Hiện print portal khi in */
+  .print-portal {
+    display: block !important;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .pdf-preview-container {
+    display: block !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    max-width: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .pdf-preview-container > div {
+    transform: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .pdf-page-sheet {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .pdf-page-sheet:first-child {
+    page-break-before: auto !important;
+    break-before: auto !important;
+  }
+
+  .pdf-page-sheet:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .report-table,
+  .report-table * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

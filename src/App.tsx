@@ -3058,18 +3058,21 @@ function LoginScreen() {
           </p>
 
           <form className="login-form" onSubmit={handleSubmit}>
-            <label htmlFor="login-username">Tên đăng nhập</label>
+            <label htmlFor="login-email">Email BIDV</label>
             <div className="login-input-wrap">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="8" r="3.5" />
                 <path d="M5 20v-1.5a7 7 0 0 1 14 0V20Z" />
               </svg>
               <input
-                id="login-username"
-                name="username"
-                type="text"
-                autoComplete="username"
-                placeholder="Nhập tên đăng nhập"
+                id="login-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                defaultValue="ngocltb4@bidv.com.vn"
+                placeholder="ten@bidv.com.vn"
+                pattern="[^@\\s]+@bidv\\.com\\.vn"
+                title="Vui lòng nhập email BIDV theo định dạng ten@bidv.com.vn"
                 required
               />
             </div>

@@ -2948,6 +2948,224 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
 
 // ── MAIN APPLICATION ──────────────────────────────────────────────────────────
 
+function LoginScreen() {
+  const [showPassword, setShowPassword] = useState(false)
+  const [message, setMessage] = useState("")
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setMessage(
+      "Hệ thống xác thực chưa được kết nối. Vui lòng liên hệ quản trị viên để được hỗ trợ.",
+    )
+  }
+
+  return (
+    <main className="login-screen">
+      <section className="login-showcase" aria-label="Giới thiệu hệ thống">
+        <div className="login-showcase__glow login-showcase__glow--one" />
+        <div className="login-showcase__glow login-showcase__glow--two" />
+        <div className="login-brand">
+          <img
+            src={`${import.meta.env.BASE_URL}bidv-flower.png`}
+            alt=""
+            className="login-brand__flower"
+          />
+          <span className="login-brand__name">BIDV</span>
+          <span className="login-brand__divider" />
+          <span className="login-brand__unit">NGÂN HÀNG BÁN LẺ</span>
+        </div>
+
+        <div className="login-showcase__content">
+          <span className="login-eyebrow">
+            <span className="login-eyebrow__dot" />
+            KHÔNG GIAN LÀM VIỆC SỐ
+          </span>
+          <h1>
+            Số liệu rõ ràng.
+            <br />
+            <span>Quyết định vững vàng.</span>
+          </h1>
+          <p>
+            Theo dõi, phân tích và quản lý báo cáo huy động vốn, tín dụng khách
+            hàng trên cùng một nền tảng.
+          </p>
+
+          <div className="login-preview" aria-label="Minh họa báo cáo">
+            <div className="login-preview__top">
+              <div>
+                <span className="login-preview__caption">TỔNG QUAN BÁO CÁO</span>
+                <strong>Kết quả kinh doanh</strong>
+              </div>
+              <span className="login-preview__period">Tháng 10</span>
+            </div>
+            <div className="login-preview__metrics">
+              <div className="login-preview__metric">
+                <span>HUY ĐỘNG VỐN</span>
+                <strong>128,6 <small>tỷ</small></strong>
+                <em>↗ 12,8% <span>so với kế hoạch</span></em>
+              </div>
+              <div className="login-preview__metric">
+                <span>TÍN DỤNG</span>
+                <strong>96,2 <small>tỷ</small></strong>
+                <em>↗ 8,4% <span>so với kế hoạch</span></em>
+              </div>
+            </div>
+            <div className="login-preview__chart">
+              <div className="login-preview__chart-label">
+                <span>Tiến độ thực hiện</span>
+                <strong>82%</strong>
+              </div>
+              <div className="login-preview__chart-track">
+                <span />
+              </div>
+              <div className="login-preview__chart-months">
+                <span>T.07</span><span>T.08</span><span>T.09</span><span>T.10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="login-showcase__footer">
+          <span>© BIDV · Hệ thống báo cáo số liệu CBKH</span>
+          <span className="login-secure">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M10 2.5 4 5v4.2c0 4 2.6 6.8 6 8.3 3.4-1.5 6-4.3 6-8.3V5l-6-2.5Z" />
+              <path d="m7.5 10 1.7 1.7 3.5-3.5" />
+            </svg>
+            Kết nối an toàn
+          </span>
+        </div>
+      </section>
+
+      <section className="login-panel" aria-labelledby="login-title">
+        <div className="login-panel__mobile-brand">
+          <img src={`${import.meta.env.BASE_URL}bidv-flower.png`} alt="" />
+          <strong>BIDV</strong>
+        </div>
+        <div className="login-form-wrap">
+          <div className="login-form-heading">
+            <span className="login-form-heading__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 3 4 6.5v5.2c0 4.4 3.4 7.8 8 9.3 4.6-1.5 8-4.9 8-9.3V6.5L12 3Z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+            </span>
+            <span>CHÀO MỪNG BẠN</span>
+          </div>
+          <h2 id="login-title">Đăng nhập</h2>
+          <p className="login-form-subtitle">
+            Đăng nhập để truy cập hệ thống báo cáo số liệu.
+          </p>
+
+          <form className="login-form" onSubmit={handleSubmit}>
+            <label htmlFor="login-username">Tên đăng nhập</label>
+            <div className="login-input-wrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M5 20v-1.5a7 7 0 0 1 14 0V20Z" />
+              </svg>
+              <input
+                id="login-username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                placeholder="Nhập tên đăng nhập"
+                required
+              />
+            </div>
+
+            <div className="login-password-label">
+              <label htmlFor="login-password">Mật khẩu</label>
+              <button
+                type="button"
+                className="login-forgot"
+                onClick={() =>
+                  setMessage(
+                    "Vui lòng liên hệ quản trị viên để được hỗ trợ khôi phục mật khẩu.",
+                  )
+                }
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
+            <div className="login-input-wrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="5" y="10" width="14" height="11" rx="2" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+              </svg>
+              <input
+                id="login-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="Nhập mật khẩu"
+                required
+              />
+              <button
+                type="button"
+                className="login-input-action"
+                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                {showPassword ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                    <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 5 8.5 7s-1.2 3.5-3.1 4.9M6.2 6.2C3.8 7.6 2.5 10 2.5 12c0 2 3.5 7 9.5 7 1.2 0 2.3-.2 3.3-.6" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            <label className="login-remember">
+              <input type="checkbox" name="remember" />
+              <span className="login-remember__box" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path d="m3 8 3.2 3.2L13 4.5" /></svg>
+              </span>
+              Ghi nhớ đăng nhập
+            </label>
+
+            {message && (
+              <p className="login-message" role="status">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <circle cx="10" cy="10" r="7.5" />
+                  <path d="M10 6v4m0 3h.01" />
+                </svg>
+                {message}
+              </p>
+            )}
+
+            <button type="submit" className="login-submit">
+              Đăng nhập
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M4 10h12m-5-5 5 5-5 5" />
+              </svg>
+            </button>
+          </form>
+
+          <div className="login-help">
+            <span className="login-help__icon" aria-hidden="true">?</span>
+            <p>
+              Cần hỗ trợ truy cập?
+              <br />
+              <span>Liên hệ quản trị viên hệ thống.</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="login-panel__footer">
+          <span>Hệ thống Báo cáo Số liệu CBKH</span>
+          <span>Phiên bản 1.0</span>
+        </div>
+      </section>
+    </main>
+  )
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
   const mainContentRef = useRef<HTMLElement>(null)
@@ -3049,6 +3267,13 @@ export default function App() {
       mainContentRef.current.scrollTop = 0
     }
   }, [page])
+
+  if (
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("view") !== "reports"
+  ) {
+    return <LoginScreen />
+  }
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>

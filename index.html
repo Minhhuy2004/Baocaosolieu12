@@ -4,20 +4,39 @@
     
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/png" href="/Baocaosolieu12/favicon.png" />
-    <link rel="shortcut icon" type="image/x-icon" href="/Baocaosolieu12/favicon.ico" />
+    <link rel="icon" type="image/png" href="/Baocaosolieu12/favicon.png?v=2" />
     <title>BIDV - Hệ thống Báo cáo Số liệu CBKH</title>
     
     <meta name="description" content="This web application offers a comprehensive dashboard for data reporting, enabling users to visualize and analyze key performance indicators across various units and categories.">
     <meta name="robots" content="noindex, nofollow">
     <meta property="og:title" content="Figma Make App">
     <meta property="og:description" content="This web application offers a comprehensive dashboard for data reporting, enabling users to visualize and analyze key performance indicators across various units and categories.">
-    <script type="module" crossorigin src="/Baocaosolieu12/assets/index-DI8pKwdb.js"></script>
-    <link rel="stylesheet" crossorigin href="/Baocaosolieu12/assets/index-Ciq_EFy8.css">
+    <script type="module" crossorigin src="/Baocaosolieu12/assets/index-C6F3J4VF.js"></script>
+    <link rel="stylesheet" crossorigin href="/Baocaosolieu12/assets/index-mA9YAan-.css">
   </head>
   <body>
     
     <div id="root"></div>
+    <script>
+      function showStartupError() {
+        var root = document.getElementById("root")
+        if (!root || root.dataset.startupError) return
+        root.dataset.startupError = "true"
+        root.innerHTML =
+          '<main style="font-family:Arial,sans-serif;max-width:560px;margin:12vh auto;padding:32px;color:#1f2937;text-align:center">' +
+          "<h1>Không tải được ứng dụng</h1>" +
+          "<p>Vui lòng thử lại sau.</p>" +
+          "</main>"
+      }
+      window.addEventListener(
+        "error",
+        function (event) {
+          if (event.target instanceof HTMLScriptElement) showStartupError()
+        },
+        true,
+      )
+      window.addEventListener("unhandledrejection", showStartupError)
+    </script>
     
   </body>
 </html>

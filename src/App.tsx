@@ -67,6 +67,32 @@ export type ReportRow = {
 }
 
 type Page = "dashboard" | "bieudo" | "solieu" | "xuatpdf"
+type AuthStorageName = "localStorage" | "sessionStorage"
+
+function readStoredAuth(storageName: AuthStorageName) {
+  try {
+    const storage = window[storageName]
+    if (storage.getItem("bidv-report-auth") !== "true") return null
+
+    return {
+      authenticated: true,
+      email: storage.getItem("bidv-report-user") || "",
+    }
+  } catch (error) {
+    console.warn(`Unable to read authentication from ${storageName}.`, error)
+    return null
+  }
+}
+
+function clearStoredAuth(storageName: AuthStorageName) {
+  try {
+    const storage = window[storageName]
+    storage.removeItem("bidv-report-auth")
+    storage.removeItem("bidv-report-user")
+  } catch (error) {
+    console.warn(`Unable to clear authentication from ${storageName}.`, error)
+  }
+}
 
 class PageErrorBoundary extends Component<
   { children: ReactNode; pageName: Page },
@@ -3243,6 +3269,7 @@ export default function App() {
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
+  const [storageWarning, setStorageWarning] = useState("")
   const [recoveredAuth] = useState(() => {
     if (typeof window === "undefined") {
       return { authenticated: false, email: "" }
@@ -3253,19 +3280,11 @@ export default function App() {
     )
     if (!isAssetRecovery) return { authenticated: false, email: "" }
 
-    if (window.sessionStorage.getItem("bidv-report-auth") === "true") {
-      return {
-        authenticated: true,
-        email: window.sessionStorage.getItem("bidv-report-user") || "",
-      }
-    }
+    const sessionAuth = readStoredAuth("sessionStorage")
+    if (sessionAuth) return sessionAuth
 
-    if (window.localStorage.getItem("bidv-report-auth") === "true") {
-      return {
-        authenticated: true,
-        email: window.localStorage.getItem("bidv-report-user") || "",
-      }
-    }
+    const rememberedAuth = readStoredAuth("localStorage")
+    if (rememberedAuth) return rememberedAuth
 
     return { authenticated: false, email: "" }
   })
@@ -3291,14 +3310,25 @@ export default function App() {
       return false
     }
 
-    const storage = remember ? window.localStorage : window.sessionStorage
-
-    storage.setItem("bidv-report-auth", "true")
-    storage.setItem("bidv-report-user", normalizedEmail)
-    if (remember) {
-      window.sessionStorage.removeItem("bidv-report-auth")
-      window.sessionStorage.removeItem("bidv-report-user")
+    const storageName = remember ? "localStorage" : "sessionStorage"
+    let persistenceFailed = false
+    try {
+      const storage = window[storageName]
+      storage.setItem("bidv-report-auth", "true")
+      storage.setItem("bidv-report-user", normalizedEmail)
+    } catch (error) {
+      console.warn(`Unable to persist authentication in ${storageName}.`, error)
+      clearStoredAuth(storageName)
+      persistenceFailed = true
     }
+    if (remember) {
+      clearStoredAuth("sessionStorage")
+    }
+    setStorageWarning(
+      persistenceFailed
+        ? "Trình duyệt đang chặn lưu phiên đăng nhập. Bạn vẫn có thể dùng hệ thống trong tab này, nhưng cần đăng nhập lại nếu tải lại trang."
+        : "",
+    )
     setCurrentUserEmail(normalizedEmail)
     setIsAuthenticated(true)
     return true
@@ -3307,10 +3337,9 @@ export default function App() {
   const handleLogout = () => {
     if (typeof window === "undefined") return
 
-    window.localStorage.removeItem("bidv-report-auth")
-    window.localStorage.removeItem("bidv-report-user")
-    window.sessionStorage.removeItem("bidv-report-auth")
-    window.sessionStorage.removeItem("bidv-report-user")
+    clearStoredAuth("localStorage")
+    clearStoredAuth("sessionStorage")
+    setStorageWarning("")
     setCurrentUserEmail("")
     setIsAuthenticated(false)
   }
@@ -3631,6 +3660,21 @@ export default function App() {
             </button>
           </div>
         </header>
+
+        {storageWarning && (
+          <div
+            role="status"
+            style={{
+              padding: "10px 24px",
+              color: "#854d0e",
+              background: "#fefce8",
+              borderBottom: "1px solid #fde68a",
+              fontSize: 13,
+            }}
+          >
+            {storageWarning}
+          </div>
+        )}
 
         {/* Main Content Area */}
         <main

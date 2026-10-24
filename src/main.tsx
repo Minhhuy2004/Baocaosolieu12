@@ -52,6 +52,24 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, {
             }}
           >
             Nội dung tạm thời không khả dụng.
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                display: "block",
+                margin: "16px auto 0",
+                padding: "9px 16px",
+                border: 0,
+                borderRadius: 6,
+                color: "#fff",
+                background: "#006b68",
+                font: "inherit",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Tải lại trang
+            </button>
           </div>
         </main>
       )

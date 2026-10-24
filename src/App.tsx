@@ -3425,6 +3425,7 @@ export default function App() {
               alignItems: "center",
               gap: 12,
               flexWrap: "wrap",
+              marginLeft: "auto",
             }}
           >
             {importSuccess && (
@@ -3456,6 +3457,55 @@ export default function App() {
               </span>
             )}
 
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#006b68",
+                color: "#fff",
+                borderRadius: 7,
+                padding: "7px 14px",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                transition: "background 0.15s",
+                marginRight: 4,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#005553")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "#006b68")}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelUpload}
+                style={{ display: "none" }}
+              />
+              Nạp Excel
+            </label>
+
+            <FilterBar
+              selectedDonVi={selectedDonVi}
+              setSelectedDonVi={setSelectedDonVi}
+              selectedCBKH={selectedCBKH}
+              setSelectedCBKH={setSelectedCBKH}
+              availableCBKH={availableCBKH}
+              units={units}
+            />
+
             <div
               style={{
                 display: "inline-flex",
@@ -3468,6 +3518,7 @@ export default function App() {
                 color: "#0f172a",
                 fontSize: 12,
                 fontWeight: 700,
+                marginLeft: 8,
               }}
             >
               <span
@@ -3519,54 +3570,6 @@ export default function App() {
               </svg>
               Đăng xuất
             </button>
-
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: "#006b68",
-                color: "#fff",
-                borderRadius: 7,
-                padding: "7px 14px",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 700,
-                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#005553")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "#006b68")}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleExcelUpload}
-                style={{ display: "none" }}
-              />
-              Nạp Excel
-            </label>
-
-            <FilterBar
-              selectedDonVi={selectedDonVi}
-              setSelectedDonVi={setSelectedDonVi}
-              selectedCBKH={selectedCBKH}
-              setSelectedCBKH={setSelectedCBKH}
-              availableCBKH={availableCBKH}
-              units={units}
-            />
           </div>
         </header>
 

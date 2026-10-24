@@ -11,13 +11,20 @@
     <meta name="robots" content="noindex, nofollow">
     <meta property="og:title" content="Figma Make App">
     <meta property="og:description" content="This web application offers a comprehensive dashboard for data reporting, enabling users to visualize and analyze key performance indicators across various units and categories.">
-    <script type="module" crossorigin src="/Baocaosolieu12/assets/index-DmLBxM7S.js"></script>
+    <script type="module" crossorigin src="/Baocaosolieu12/assets/index-DhSNlnxf.js"></script>
     <link rel="stylesheet" crossorigin href="/Baocaosolieu12/assets/index-B8pDVEvl.css">
   </head>
   <body>
     
     <div id="root"></div>
     <script>
+      function reloadOnceForStaleAssets() {
+        var url = new URL(window.location.href)
+        if (url.searchParams.has("__asset_reload")) return false
+        url.searchParams.set("__asset_reload", String(Date.now()))
+        window.location.replace(url.toString())
+        return true
+      }
       function showStartupError() {
         var root = document.getElementById("root")
         if (!root || root.dataset.startupError) return
@@ -31,11 +38,18 @@
       window.addEventListener(
         "error",
         function (event) {
-          if (event.target instanceof HTMLScriptElement) showStartupError()
+          if (
+            event.target instanceof HTMLScriptElement &&
+            !reloadOnceForStaleAssets()
+          ) {
+            showStartupError()
+          }
         },
         true,
       )
-      window.addEventListener("unhandledrejection", showStartupError)
+      window.addEventListener("unhandledrejection", function () {
+        if (!reloadOnceForStaleAssets()) showStartupError()
+      })
     </script>
     
   </body>

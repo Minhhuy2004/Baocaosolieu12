@@ -24,13 +24,14 @@ and publishable/anon key. `.env.local` is ignored by Git.
 
 ## GitHub Pages deployment
 
-In the repository, open **Settings → Secrets and variables → Actions → Variables**
-and add:
+In the repository, open **Settings → Secrets and variables → Actions** and add
+these names under either **Variables** (recommended for public client settings)
+or **Secrets**:
 
 - `VITE_SUPABASE_URL`: the Supabase project URL
 - `VITE_SUPABASE_ANON_KEY`: the publishable/anon key
 
-The deploy workflow checks that both variables exist before building, then injects
+The deploy workflow checks that both values exist before building, then injects
 them into the static frontend. These values are public client configuration, not
 server secrets. Supabase authorization must be enforced by Supabase policies.
 

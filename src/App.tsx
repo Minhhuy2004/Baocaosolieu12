@@ -2951,7 +2951,7 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
 function LoginScreen({
   onLogin,
 }: {
-  onLogin: (email: string, password: string, remember: boolean) => void
+  onLogin: (email: string, password: string, remember: boolean) => boolean
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState("")
@@ -2963,9 +2963,9 @@ function LoginScreen({
     const password = String(formData.get("password") ?? "").trim()
     const remember = formData.get("remember") === "on"
 
-    if (!/^[^@\s]+@bidv\.com\.vn$/i.test(email)) {
+    if (!/^[a-z]+[0-9]+@bidv\.com\.vn$/i.test(email)) {
       setMessage(
-        "Email không hợp lệ. Vui lòng nhập email BIDV theo định dạng ten@bidv.com.vn.",
+        "Email không hợp lệ. Vui lòng nhập email BIDV theo định dạng ten123@bidv.com.vn.",
       )
       return
     }
@@ -2975,7 +2975,10 @@ function LoginScreen({
       return
     }
 
-    onLogin(email, password, remember)
+    const isAuthenticated = onLogin(email, password, remember)
+    if (!isAuthenticated) {
+      setMessage("Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.")
+    }
   }
 
   return (
@@ -3088,10 +3091,10 @@ function LoginScreen({
                 name="email"
                 type="email"
                 autoComplete="email"
-                defaultValue="ngocltb4@bidv.com.vn"
-                placeholder="ten@bidv.com.vn"
-                pattern="[^@\\s]+@bidv\\.com\\.vn"
-                title="Vui lòng nhập email BIDV theo định dạng ten@bidv.com.vn"
+                defaultValue="huy176098@bidv.com.vn"
+                placeholder="huy176098@bidv.com.vn"
+                pattern="[a-zA-Z]+[0-9]+@bidv\\.com\\.vn"
+                title="Vui lòng nhập email BIDV theo định dạng ten123@bidv.com.vn"
                 required
               />
             </div>
@@ -3203,15 +3206,28 @@ export default function App() {
     return savedStatus || viewParam === "reports"
   })
 
-  const handleLogin = (email: string, password: string, remember: boolean) => {
-    if (!email || !password) return
+  const handleLogin = (
+    email: string,
+    password: string,
+    remember: boolean,
+  ): boolean => {
+    const normalizedEmail = email.trim().toLowerCase()
+    const isValidCredentials =
+      (normalizedEmail === "huy176098@bidv.com.vn" ||
+        normalizedEmail === "huy176098@gmail.com") &&
+      password === "Huy2704@"
+
+    if (!isValidCredentials) {
+      return false
+    }
 
     const storage = remember ? window.localStorage : window.sessionStorage
+    const otherStorage = remember ? window.sessionStorage : window.localStorage
+
     storage.setItem("bidv-report-auth", "true")
-    if (!remember) {
-      window.localStorage.setItem("bidv-report-auth", "true")
-    }
+    otherStorage.removeItem("bidv-report-auth")
     setIsAuthenticated(true)
+    return true
   }
 
   useEffect(() => {

@@ -2963,9 +2963,13 @@ function LoginScreen({
     const password = String(formData.get("password") ?? "").trim()
     const remember = formData.get("remember") === "on"
 
-    if (!/^[a-z]+[0-9]+@bidv\.com\.vn$/i.test(email)) {
+    const isAllowedEmail =
+      /^[a-z]+[0-9]+@bidv\.com\.vn$/i.test(email) ||
+      /^[a-z0-9._%+-]+@gmail\.com$/i.test(email)
+
+    if (!isAllowedEmail) {
       setMessage(
-        "Email không hợp lệ. Vui lòng nhập email BIDV theo định dạng ten123@bidv.com.vn.",
+        "Email không hợp lệ. Vui lòng nhập email theo định dạng ten123@bidv.com.vn hoặc gmail.",
       )
       return
     }
@@ -3091,10 +3095,10 @@ function LoginScreen({
                 name="email"
                 type="email"
                 autoComplete="email"
-                defaultValue="huy176098@bidv.com.vn"
-                placeholder="huy176098@bidv.com.vn"
-                pattern="[a-zA-Z]+[0-9]+@bidv\\.com\\.vn"
-                title="Vui lòng nhập email BIDV theo định dạng ten123@bidv.com.vn"
+                defaultValue="huy176098@gmail.com"
+                placeholder="huy176098@gmail.com hoặc huy176098@bidv.com.vn"
+                pattern="(?:[a-zA-Z]+[0-9]+@bidv\\.com\\.vn|[a-zA-Z0-9._%+-]+@gmail\\.com)"
+                title="Vui lòng nhập email theo định dạng huy176098@gmail.com hoặc huy176098@bidv.com.vn"
                 required
               />
             </div>

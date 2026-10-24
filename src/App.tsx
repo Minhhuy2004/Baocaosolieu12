@@ -2948,15 +2948,34 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
 
 // ── MAIN APPLICATION ──────────────────────────────────────────────────────────
 
-function LoginScreen() {
+function LoginScreen({
+  onLogin,
+}: {
+  onLogin: (email: string, password: string, remember: boolean) => void
+}) {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState("")
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setMessage(
-      "Hệ thống xác thực chưa được kết nối. Vui lòng liên hệ quản trị viên để được hỗ trợ.",
-    )
+    const formData = new FormData(event.currentTarget)
+    const email = String(formData.get("email") ?? "").trim().toLowerCase()
+    const password = String(formData.get("password") ?? "").trim()
+    const remember = formData.get("remember") === "on"
+
+    if (!/^[^@\s]+@bidv\.com\.vn$/i.test(email)) {
+      setMessage(
+        "Email không hợp lệ. Vui lòng nhập email BIDV theo định dạng ten@bidv.com.vn.",
+      )
+      return
+    }
+
+    if (!password) {
+      setMessage("Vui lòng nhập mật khẩu để đăng nhập.")
+      return
+    }
+
+    onLogin(email, password, remember)
   }
 
   return (
@@ -3174,6 +3193,50 @@ export default function App() {
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window === "undefined") return false
+
+    const savedStatus =
+      window.localStorage.getItem("bidv-report-auth") === "true" ||
+      window.sessionStorage.getItem("bidv-report-auth") === "true"
+    const viewParam = new URLSearchParams(window.location.search).get("view")
+    return savedStatus || viewParam === "reports"
+  })
+
+  const handleLogin = (email: string, password: string, remember: boolean) => {
+    if (!email || !password) return
+
+    const storage = remember ? window.localStorage : window.sessionStorage
+    storage.setItem("bidv-report-auth", "true")
+    if (!remember) {
+      window.localStorage.setItem("bidv-report-auth", "true")
+    }
+    setIsAuthenticated(true)
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+
+    if (isAuthenticated) {
+      params.set("view", "reports")
+      const nextUrl = `${window.location.pathname}?${params.toString()}`
+      if (window.location.href !== `${window.location.origin}${nextUrl}`) {
+        window.history.replaceState({}, "", nextUrl)
+      }
+      window.localStorage.setItem("bidv-report-auth", "true")
+      return
+    }
+
+    params.delete("view")
+    const nextUrl = params.toString()
+      ? `${window.location.pathname}?${params.toString()}`
+      : window.location.pathname
+    window.history.replaceState({}, "", nextUrl)
+    window.localStorage.removeItem("bidv-report-auth")
+    window.sessionStorage.removeItem("bidv-report-auth")
+  }, [isAuthenticated])
 
   // Load verified authentic initial data directly matching the master Excel/PDF
   const [members, setMembers] = useState<Member[]>(
@@ -3271,11 +3334,8 @@ export default function App() {
     }
   }, [page])
 
-  if (
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("view") !== "reports"
-  ) {
-    return <LoginScreen />
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} />
   }
 
   return (

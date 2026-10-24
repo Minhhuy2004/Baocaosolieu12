@@ -3625,7 +3625,13 @@ export default function App() {
             <div className="page-transition-indicator" aria-hidden="true" />
           )}
           <PageErrorBoundary key={page} pageName={page}>
-            <div className="page-fade-in" style={{ minHeight: "100%" }}>
+            <div
+              className="page-fade-in"
+              style={{
+                minHeight: "100%",
+                background: page === "xuatpdf" ? "#f8fafc" : "#f1f5f9",
+              }}
+            >
               {page === "dashboard" && (
                 <DashboardPage members={filteredMembers} />
               )}

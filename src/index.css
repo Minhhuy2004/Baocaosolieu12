@@ -875,7 +875,7 @@ html, body {
 /* ── SMOOTH PAGE TRANSITIONS ── */
 @keyframes pageFadeIn {
   from {
-    opacity: 0;
+    opacity: 0.92;
   }
   to {
     opacity: 1;
@@ -883,7 +883,7 @@ html, body {
 }
 
 .page-fade-in {
-  animation: pageFadeIn 0.18s ease-out both;
+  animation: pageFadeIn 0.16s ease-out both;
 }
 
 .page-transition-indicator {

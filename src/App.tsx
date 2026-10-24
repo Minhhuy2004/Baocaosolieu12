@@ -3200,15 +3200,16 @@ export default function App() {
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window === "undefined") return false
+  const [currentUserEmail, setCurrentUserEmail] = useState(() => {
+    if (typeof window === "undefined") return ""
 
-    const savedStatus =
-      window.localStorage.getItem("bidv-report-auth") === "true" ||
-      window.sessionStorage.getItem("bidv-report-auth") === "true"
-    const viewParam = new URLSearchParams(window.location.search).get("view")
-    return savedStatus || viewParam === "reports"
+    return (
+      window.localStorage.getItem("bidv-report-user") ||
+      window.sessionStorage.getItem("bidv-report-user") ||
+      ""
+    )
   })
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const handleLogin = (
     email: string,
@@ -3231,9 +3232,23 @@ export default function App() {
     const otherStorage = remember ? window.sessionStorage : window.localStorage
 
     storage.setItem("bidv-report-auth", "true")
+    storage.setItem("bidv-report-user", normalizedEmail)
     otherStorage.removeItem("bidv-report-auth")
+    otherStorage.removeItem("bidv-report-user")
+    setCurrentUserEmail(normalizedEmail)
     setIsAuthenticated(true)
     return true
+  }
+
+  const handleLogout = () => {
+    if (typeof window === "undefined") return
+
+    window.localStorage.removeItem("bidv-report-auth")
+    window.localStorage.removeItem("bidv-report-user")
+    window.sessionStorage.removeItem("bidv-report-auth")
+    window.sessionStorage.removeItem("bidv-report-user")
+    setCurrentUserEmail("")
+    setIsAuthenticated(false)
   }
 
   useEffect(() => {
@@ -3257,7 +3272,9 @@ export default function App() {
       : window.location.pathname
     window.history.replaceState({}, "", nextUrl)
     window.localStorage.removeItem("bidv-report-auth")
+    window.localStorage.removeItem("bidv-report-user")
     window.sessionStorage.removeItem("bidv-report-auth")
+    window.sessionStorage.removeItem("bidv-report-user")
   }, [isAuthenticated])
 
   // Load verified authentic initial data directly matching the master Excel/PDF
@@ -3438,6 +3455,70 @@ export default function App() {
                 ✕ {importError}
               </span>
             )}
+
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 999,
+                padding: "6px 10px",
+                color: "#0f172a",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              <span
+                style={{
+                  width: 24,
+                  height: 24,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "50%",
+                  background: "#dbeafe",
+                  color: "#1d4ed8",
+                  fontSize: 11,
+                }}
+              >
+                {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : "U"}
+              </span>
+              <span>{currentUserEmail || "Tài khoản"}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                border: "1px solid #fecaca",
+                background: "#fff1f2",
+                color: "#b91c1c",
+                borderRadius: 7,
+                padding: "7px 12px",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              Đăng xuất
+            </button>
 
             <label
               style={{

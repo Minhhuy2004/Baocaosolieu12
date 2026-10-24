@@ -2964,12 +2964,12 @@ function LoginScreen({
     const remember = formData.get("remember") === "on"
 
     const isAllowedEmail =
-      /^[a-z]+[0-9]+@bidv\.com\.vn$/i.test(email) ||
-      /^[a-z0-9._%+-]+@gmail\.com$/i.test(email)
+      /huy176098@bidv\.com\.vn$/i.test(email) ||
+      /huy176098@gmail\.com$/i.test(email)
 
     if (!isAllowedEmail) {
       setMessage(
-        "Email không hợp lệ. Vui lòng nhập email theo định dạng ten123@bidv.com.vn hoặc gmail.",
+        "Email không hợp lệ. Vui lòng nhập huy176098@gmail.com hoặc huy176098@bidv.com.vn.",
       )
       return
     }
@@ -3216,10 +3216,12 @@ export default function App() {
     remember: boolean,
   ): boolean => {
     const normalizedEmail = email.trim().toLowerCase()
+    const normalizedPassword = password.trim()
     const isValidCredentials =
       (normalizedEmail === "huy176098@bidv.com.vn" ||
         normalizedEmail === "huy176098@gmail.com") &&
-      password === "Huy2704@"
+      (normalizedPassword === "Huy2704@" ||
+        normalizedPassword.toLowerCase() === "huy2704@")
 
     if (!isValidCredentials) {
       return false

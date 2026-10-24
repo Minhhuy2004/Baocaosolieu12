@@ -7,6 +7,7 @@
   useRef,
   useEffect,
   useCallback,
+  useTransition,
   type ErrorInfo,
   type ReactNode,
 } from "react"
@@ -3232,6 +3233,7 @@ function LoginScreen({
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
+  const [isPagePending, startPageTransition] = useTransition()
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
@@ -3398,7 +3400,7 @@ export default function App() {
 
   const navigateToPage = (nextPage: Page) => {
     if (nextPage !== page) {
-      setPage(nextPage)
+      startPageTransition(() => setPage(nextPage))
     }
   }
 
@@ -3611,12 +3613,17 @@ export default function App() {
         {/* Main Content Area */}
         <main
           ref={mainContentRef}
+          aria-busy={isPagePending}
           style={{
             flex: 1,
             overflowY: "auto",
             background: page === "xuatpdf" ? "#f8fafc" : "#f1f5f9",
+            position: "relative",
           }}
         >
+          {isPagePending && (
+            <div className="page-transition-indicator" aria-hidden="true" />
+          )}
           <PageErrorBoundary key={page} pageName={page}>
             <div className="page-fade-in" style={{ minHeight: "100%" }}>
               {page === "dashboard" && (

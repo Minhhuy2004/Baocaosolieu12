@@ -876,22 +876,53 @@ html, body {
 @keyframes pageFadeIn {
   from {
     opacity: 0;
-    transform: translate3d(0, 8px, 0) scale(0.995);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 .page-fade-in {
-  animation: pageFadeIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: opacity, transform;
+  animation: pageFadeIn 0.18s ease-out both;
+}
+
+.page-transition-indicator {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(0, 107, 104, 0.12);
+}
+
+.page-transition-indicator::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: #008b84;
+  content: "";
+  animation: pageProgress 0.7s ease-in-out infinite;
+}
+
+@keyframes pageProgress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .page-fade-in {
     animation: none;
-    will-change: auto;
+  }
+
+  .page-transition-indicator::after {
+    animation: none;
+    width: 100%;
   }
 }

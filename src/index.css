@@ -872,20 +872,7 @@ html, body {
   }
 }
 
-/* ── SMOOTH PAGE TRANSITIONS ── */
-@keyframes pageFadeIn {
-  from {
-    opacity: 0.92;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.page-fade-in {
-  animation: pageFadeIn 0.16s ease-out both;
-}
-
+/* ── PAGE TRANSITION INDICATOR ── */
 .page-transition-indicator {
   position: absolute;
   z-index: 1;
@@ -917,10 +904,6 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-fade-in {
-    animation: none;
-  }
-
   .page-transition-indicator::after {
     animation: none;
     width: 100%;

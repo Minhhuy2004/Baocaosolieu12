@@ -3626,7 +3626,6 @@ export default function App() {
           )}
           <PageErrorBoundary key={page} pageName={page}>
             <div
-              className="page-fade-in"
               style={{
                 minHeight: "100%",
                 background: page === "xuatpdf" ? "#f8fafc" : "#f1f5f9",

@@ -12,6 +12,13 @@
     <!-- figma:body-start -->
     <div id="root"></div>
     <script>
+      function reloadOnceForStaleAssets() {
+        var url = new URL(window.location.href)
+        if (url.searchParams.has("__asset_reload")) return false
+        url.searchParams.set("__asset_reload", String(Date.now()))
+        window.location.replace(url.toString())
+        return true
+      }
       function showStartupError() {
         var root = document.getElementById("root")
         if (!root || root.dataset.startupError) return
@@ -25,11 +32,18 @@
       window.addEventListener(
         "error",
         function (event) {
-          if (event.target instanceof HTMLScriptElement) showStartupError()
+          if (
+            event.target instanceof HTMLScriptElement &&
+            !reloadOnceForStaleAssets()
+          ) {
+            showStartupError()
+          }
         },
         true,
       )
-      window.addEventListener("unhandledrejection", showStartupError)
+      window.addEventListener("unhandledrejection", function () {
+        if (!reloadOnceForStaleAssets()) showStartupError()
+      })
     </script>
     <script type="module" src="/src/main.tsx"></script>
     <!-- figma:body-end -->

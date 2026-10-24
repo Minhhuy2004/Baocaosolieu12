@@ -16,15 +16,22 @@ import type { WorkBook } from "xlsx"
 import initialData from "./initialData.json"
 
 const DashboardChart = lazy(() =>
-  import("./chart-renderer").then((module) => ({
-    default: module.DashboardChart,
-  })),
+  loadChartRenderer().then((module) => ({ default: module.DashboardChart })),
 )
 const BieuDoChart = lazy(() =>
-  import("./chart-renderer").then((module) => ({
-    default: module.BieuDoChart,
-  })),
+  loadChartRenderer().then((module) => ({ default: module.BieuDoChart })),
 )
+
+function loadChartRenderer() {
+  return import("./chart-renderer").then((module) => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.has("__asset_reload")) {
+      url.searchParams.delete("__asset_reload")
+      window.history.replaceState({}, "", url.toString())
+    }
+    return module
+  })
+}
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -3133,7 +3140,6 @@ function LoginScreen({
                 autoComplete="email"
                 defaultValue="huy176098@gmail.com"
                 placeholder="huy176098@gmail.com hoặc huy176098@bidv.com.vn"
-                pattern="(?:[a-zA-Z]+[0-9]+@bidv\\.com\\.vn|[a-zA-Z0-9._%+-]+@gmail\\.com)"
                 title="Vui lòng nhập email theo định dạng huy176098@gmail.com hoặc huy176098@bidv.com.vn"
                 required
               />
@@ -3246,7 +3252,17 @@ export default function App() {
       ""
     )
   })
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window === "undefined") return false
+    const isAssetRecovery = new URLSearchParams(window.location.search).has(
+      "__asset_reload",
+    )
+    return (
+      isAssetRecovery &&
+      (window.localStorage.getItem("bidv-report-auth") === "true" ||
+        window.sessionStorage.getItem("bidv-report-auth") === "true")
+    )
+  })
 
   const handleLogin = (
     email: string,

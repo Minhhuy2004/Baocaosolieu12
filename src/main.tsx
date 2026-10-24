@@ -3,6 +3,16 @@ import ReactDOM from "react-dom/client"
 import App from "./App"
 import "./index.css"
 
+window.addEventListener("vite:preloadError", (event) => {
+  event.preventDefault()
+
+  const url = new URL(window.location.href)
+  if (url.searchParams.has("__asset_reload")) return
+
+  url.searchParams.set("__asset_reload", String(Date.now()))
+  window.location.replace(url.toString())
+})
+
 class AppErrorBoundary extends React.Component<React.PropsWithChildren, {
   hasError: boolean
 }> {

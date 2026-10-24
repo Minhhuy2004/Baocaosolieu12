@@ -1,4 +1,4 @@
-import {
+﻿import {
   Component,
   lazy,
   Suspense,
@@ -6,6 +6,8 @@ import {
   useMemo,
   useRef,
   useEffect,
+  useTransition,
+  useCallback,
   type ErrorInfo,
   type ReactNode,
 } from "react"
@@ -61,12 +63,23 @@ type Page = "dashboard" | "bieudo" | "solieu" | "xuatpdf"
 
 class PageErrorBoundary extends Component<
   { children: ReactNode; pageName: Page },
-  { hasError: boolean }
+  { hasError: boolean; errorPage: Page | null }
 > {
-  state = { hasError: false }
+  state = { hasError: false, errorPage: null as Page | null }
 
   static getDerivedStateFromError() {
     return { hasError: true }
+  }
+
+  // Reset lỗi khi chuyển sang trang khác
+  static getDerivedStateFromProps(
+    props: { pageName: Page },
+    state: { hasError: boolean; errorPage: Page | null },
+  ) {
+    if (state.hasError && state.errorPage !== props.pageName) {
+      return { hasError: false, errorPage: null }
+    }
+    return null
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -75,10 +88,11 @@ class PageErrorBoundary extends Component<
       error,
       info.componentStack,
     )
+    this.setState({ errorPage: this.props.pageName })
   }
 
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError && this.state.errorPage === this.props.pageName) {
       return (
         <div
           role="alert"
@@ -92,7 +106,11 @@ class PageErrorBoundary extends Component<
             textAlign: "center",
           }}
         >
-          Không thể hiển thị chức năng này. Vui lòng chọn chức năng khác.
+          <div>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Chức năng gặp lỗi</div>
+            <div style={{ fontSize: 13 }}>Vui lòng chọn chức năng khác hoặc tải lại trang.</div>
+          </div>
         </div>
       )
     }
@@ -2824,7 +2842,7 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
   },
 ]
 
-function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
+function Sidebar({ page, setPage, isPending }: { page: Page; setPage: (p: Page) => void; isPending?: boolean }) {
   return (
     <aside
       className="no-print"
@@ -2840,107 +2858,168 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
         borderRight: "1px solid rgba(0,0,0,0.1)",
       }}
     >
-      {/* Header Sidebar nhận diện thương hiệu BIDV */}
+      {/* ── PHẦN TRÊN: Logo BIDV + Nút Đăng xuất ── */}
       <div
         style={{
-          padding: "20px 18px 16px",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          padding: "14px 14px 12px",
+          borderBottom: "1px solid rgba(255,255,255,0.10)",
         }}
       >
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 900,
-            letterSpacing: 2,
-            color: "#fdb71a",
-            marginBottom: 4,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span>BIDV</span>
-          {/* Biểu tượng hoa mai vàng BIDV */}
+        {/* Logo BIDV + tên hệ thống */}
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
           <img
             src={`${import.meta.env.BASE_URL}bidv-flower.png`}
             alt="BIDV"
-            style={{ width: 20, height: 20, objectFit: "contain" }}
+            style={{ width: 28, height: 28, objectFit: "contain", flexShrink: 0 }}
           />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: 2, color: "#fdb71a", lineHeight: 1 }}>
+              BIDV
+            </div>
+            <div style={{ fontSize: 10, color: "#bfe3e1", fontWeight: 500, lineHeight: 1.3, marginTop: 2 }}>
+              Hệ thống Báo cáo Số liệu
+            </div>
+          </div>
         </div>
+
+        {/* Card người dùng + nút Thoát */}
         <div
           style={{
-            fontSize: 14,
-            fontWeight: 800,
-            color: "#ffffff",
-            lineHeight: 1.35,
+            background: "rgba(255,255,255,0.06)",
+            borderRadius: 8,
+            padding: "8px 10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 6,
+            border: "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          Hệ thống Báo cáo
-          <br />
-          Số liệu CBKH
+          {/* Avatar + Tên */}
+          <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: "#fdb71a",
+                color: "#004b49",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 900,
+                fontSize: 13,
+                flexShrink: 0,
+              }}
+            >
+              N
+            </div>
+            <div style={{ lineHeight: 1.25, minWidth: 0, overflow: "hidden" }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                Nguyễn Thanh Liêm
+              </div>
+              <div style={{ fontSize: 10, color: "#bfe3e1" }}>Giám đốc CN</div>
+            </div>
+          </div>
+
+          {/* Nút Thoát */}
+          <button
+            onClick={() => {
+              if (window.confirm("Bạn có muốn đăng xuất không?")) window.location.reload()
+            }}
+            style={{
+              background: "rgba(220,38,38,0.18)",
+              border: "1px solid rgba(220,38,38,0.40)",
+              borderRadius: 5,
+              color: "#fca5a5",
+              padding: "4px 9px",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 700,
+              flexShrink: 0,
+              whiteSpace: "nowrap",
+              fontFamily: "'Be Vietnam Pro', sans-serif",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(220,38,38,0.32)"
+              e.currentTarget.style.color = "#fff"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(220,38,38,0.18)"
+              e.currentTarget.style.color = "#fca5a5"
+            }}
+          >
+            Thoát
+          </button>
         </div>
       </div>
 
-      {/* Danh sách 4 menu cơ bản */}
-      <nav style={{ flex: 1, padding: "10px 0" }}>
-        {NAV.map((item) => {
-          const isActive = page === item.id
-          return (
-            <button
-              key={item.id}
-              onClick={() => setPage(item.id)}
-              aria-current={isActive ? "page" : undefined}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                width: "100%",
-                padding: "11px 18px",
-                border: "none",
-                cursor: "pointer",
-                textAlign: "left",
-                background: isActive ? "rgba(253,183,26,0.15)" : "transparent",
-                borderLeft: isActive
-                  ? "3.5px solid #fdb71a"
-                  : "3.5px solid transparent",
-                color: isActive ? "#fdb71a" : "#b2d6d4",
-                fontSize: 13,
-                fontWeight: isActive ? 700 : 500,
-                transition: "all 0.15s",
-                fontFamily: "'Be Vietnam Pro', sans-serif",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.color = "#ffffff"
-                  e.currentTarget.style.background = "rgba(255,255,255,0.06)"
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.color = "#b2d6d4"
-                  e.currentTarget.style.background = "transparent"
-                }
-              }}
-            >
-              <span style={{ opacity: isActive ? 1 : 0.75 }}>
-                {item.icon}
-              </span>
-              {item.label}
-            </button>
-          )
-        })}
-      </nav>
+      {/* ── PHẦN GIỮA: khoảng đệm đẩy nav xuống đáy ── */}
+      <div style={{ flex: 1 }} />
 
-      <div
-        style={{
-          padding: "12px 18px",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-          color: "#80b8b5",
-          fontSize: 11,
-          fontWeight: 600,
-        }}
-      >
-        Báo cáo HĐV & TD chuẩn
+      {/* ── PHẦN DƯỚI: Menu + footer ── */}
+      <div>
+        <nav style={{ padding: "10px 0" }}>
+          {NAV.map((item) => {
+            const isActive = page === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => setPage(item.id)}
+                aria-current={isActive ? "page" : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "100%",
+                  padding: "11px 18px",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  background: isActive ? "rgba(253,183,26,0.15)" : "transparent",
+                  borderLeft: isActive
+                    ? "3.5px solid #fdb71a"
+                    : "3.5px solid transparent",
+                  color: isActive ? "#fdb71a" : "#b2d6d4",
+                  fontSize: 13,
+                  fontWeight: isActive ? 700 : 500,
+                  transition: "all 0.18s ease",
+                  opacity: isPending ? 0.65 : 1,
+                  fontFamily: "'Be Vietnam Pro', sans-serif",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.color = "#ffffff"
+                    e.currentTarget.style.background = "rgba(255,255,255,0.06)"
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.color = "#b2d6d4"
+                    e.currentTarget.style.background = "transparent"
+                  }
+                }}
+              >
+                <span style={{ opacity: isActive ? 1 : 0.75 }}>
+                  {item.icon}
+                </span>
+                {item.label}
+              </button>
+            )
+          })}
+        </nav>
+
+        <div
+          style={{
+            padding: "10px 18px",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            color: "#80b8b5",
+            fontSize: 11,
+            fontWeight: 600,
+          }}
+        >
+          Báo cáo HĐV &amp; TD chuẩn
+        </div>
       </div>
     </aside>
   )
@@ -3197,6 +3276,7 @@ function LoginScreen({
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
+  const [isPending, startTransition] = useTransition()
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
@@ -3380,7 +3460,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       {/* Sidebar nhận diện thương hiệu BIDV */}
-      <Sidebar page={page} setPage={navigateToPage} />
+      <Sidebar page={page} setPage={navigateToPage} isPending={isPending} />
 
       <div
         style={{
@@ -3582,24 +3662,25 @@ export default function App() {
             background: page === "xuatpdf" ? "#f8fafc" : "#f1f5f9",
           }}
         >
-          <PageErrorBoundary key={page} pageName={page}>
-            <div>
-              {page === "dashboard" && (
+          <PageErrorBoundary pageName={page}>
+            <div style={{ position: "relative", minHeight: "100%" }}>
+              {/* Tất cả pages mount 1 lần, dùng display để ẩn/hiện - tránh remount */}
+              <div style={{ display: page === "dashboard" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
                 <DashboardPage members={filteredMembers} />
-              )}
-              {page === "bieudo" && (
+              </div>
+              <div style={{ display: page === "bieudo" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
                 <BieuDoPage members={filteredMembers} units={units} />
-              )}
-              {page === "solieu" && (
+              </div>
+              <div style={{ display: page === "solieu" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
                 <SoLieuPage members={filteredMembers} units={units} />
-              )}
-              {page === "xuatpdf" && (
+              </div>
+              <div style={{ display: page === "xuatpdf" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
                 <XuatPDFPage
                   rows={sourceRows}
                   sourceName={sourceName}
                   onUploadExcel={handleExcelUpload}
                 />
-              )}
+              </div>
             </div>
           </PageErrorBoundary>
         </main>

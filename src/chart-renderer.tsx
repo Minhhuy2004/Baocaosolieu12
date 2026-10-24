@@ -32,22 +32,27 @@ type ChartTooltipProps = {
 
 type BieuDoChartProps = {
   kind: "compare" | "unit" | "conth" | "perday"
-  data: ChartDatum[]
+  data?: ChartDatum[]
   actualFill?: string
   groupByUnit?: boolean
   average?: number
 }
 
-function formatNumber(value: number): string {
-  return value.toLocaleString("en-US", {
+function formatNumber(value: unknown): string {
+  const num = typeof value === "number" ? value : Number(value)
+  if (!Number.isFinite(num)) return "0.0"
+  return num.toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })
 }
 
-function barColor(value: number, average: number): string {
-  if (value > average * 1.5) return "#dc2626"
-  if (value > average) return "#d97706"
+function barColor(value: unknown, average: unknown): string {
+  const v = typeof value === "number" ? value : Number(value)
+  const a = typeof average === "number" ? average : Number(average)
+  if (!Number.isFinite(v) || !Number.isFinite(a)) return "#059669"
+  if (v > a * 1.5) return "#dc2626"
+  if (v > a) return "#d97706"
   return "#059669"
 }
 
@@ -106,12 +111,28 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
 }
 
 export function DashboardChart({
-  data,
-  actualFill,
+  data = [],
+  actualFill = "#005855",
 }: {
-  data: DashboardDatum[]
-  actualFill: string
+  data?: DashboardDatum[]
+  actualFill?: string
 }) {
+  if (!data || !data.length) {
+    return (
+      <div
+        style={{
+          height: 280,
+          display: "grid",
+          placeItems: "center",
+          color: "#94a3b8",
+          fontSize: 13,
+        }}
+      >
+        Chưa có dữ liệu biểu đồ
+      </div>
+    )
+  }
+
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ left: 0, right: 8 }}>
@@ -144,11 +165,27 @@ export function DashboardChart({
 
 export function BieuDoChart({
   kind,
-  data,
+  data = [],
   actualFill = "#005855",
   groupByUnit = false,
   average = 0,
 }: BieuDoChartProps) {
+  if (!data || !data.length) {
+    return (
+      <div
+        style={{
+          height: 320,
+          display: "grid",
+          placeItems: "center",
+          color: "#94a3b8",
+          fontSize: 13,
+        }}
+      >
+        Chưa có dữ liệu biểu đồ
+      </div>
+    )
+  }
+
   if (kind === "compare" || kind === "unit") {
     return (
       <ResponsiveContainer width="100%" height={340}>
@@ -202,12 +239,20 @@ export function BieuDoChart({
 
   const dataKey = kind === "conth" ? "Còn TH" : "Tỷ/ngày"
   const chartHeight = Math.max(320, data.length * 26)
-  const formatValue = (value: number) =>
-    kind === "conth" ? formatNumber(value) : value.toFixed(3)
-  const formatTooltipValue = (value: number): [string, string] =>
-    kind === "conth"
-      ? [`${formatNumber(value)} tỷ`, "Còn thực hiện"]
-      : [`${value.toFixed(4)} tỷ/ngày`, "Cần đạt mỗi ngày"]
+  const formatValue = (value: unknown) => {
+    const num = typeof value === "number" ? value : Number(value)
+    if (!Number.isFinite(num)) return "0.0"
+    return kind === "conth" ? formatNumber(num) : num.toFixed(3)
+  }
+  const formatTooltipValue = (value: unknown): [string, string] => {
+    const num = typeof value === "number" ? value : Number(value)
+    if (!Number.isFinite(num)) {
+      return ["0 tỷ", kind === "conth" ? "Còn thực hiện" : "Cần đạt mỗi ngày"]
+    }
+    return kind === "conth"
+      ? [`${formatNumber(num)} tỷ`, "Còn thực hiện"]
+      : [`${num.toFixed(4)} tỷ/ngày`, "Cần đạt mỗi ngày"]
+  }
 
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
@@ -249,7 +294,7 @@ export function BieuDoChart({
           tickLine={false}
           width={groupByUnit ? 62 : 40}
         />
-        <Tooltip formatter={(value) => formatTooltipValue(Number(value) || 0)} />
+        <Tooltip formatter={(value) => formatTooltipValue(value)} />
         <ReferenceLine
           x={average}
           stroke="#f59e0b"
@@ -259,7 +304,7 @@ export function BieuDoChart({
             value:
               kind === "conth"
                 ? `TB: ${formatNumber(average)} tỷ`
-                : `TB: ${average.toFixed(3)} tỷ/ngày`,
+                : `TB: ${(Number(average) || 0).toFixed(3)} tỷ/ngày`,
             position: "insideTopRight",
             fontSize: 11,
             fill: "#b45309",
@@ -270,7 +315,7 @@ export function BieuDoChart({
           {data.map((item, index) => (
             <Cell
               key={`${kind}-cell-${index}`}
-              fill={barColor(Number(item[dataKey]) || 0, average)}
+              fill={barColor(item[dataKey], average)}
             />
           ))}
         </Bar>

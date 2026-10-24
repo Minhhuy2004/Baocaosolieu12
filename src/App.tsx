@@ -6,7 +6,6 @@
   useMemo,
   useRef,
   useEffect,
-  useTransition,
   useCallback,
   type ErrorInfo,
   type ReactNode,
@@ -63,23 +62,12 @@ type Page = "dashboard" | "bieudo" | "solieu" | "xuatpdf"
 
 class PageErrorBoundary extends Component<
   { children: ReactNode; pageName: Page },
-  { hasError: boolean; errorPage: Page | null }
+  { hasError: boolean }
 > {
-  state = { hasError: false, errorPage: null as Page | null }
+  state = { hasError: false }
 
   static getDerivedStateFromError() {
     return { hasError: true }
-  }
-
-  // Reset lỗi khi chuyển sang trang khác
-  static getDerivedStateFromProps(
-    props: { pageName: Page },
-    state: { hasError: boolean; errorPage: Page | null },
-  ) {
-    if (state.hasError && state.errorPage !== props.pageName) {
-      return { hasError: false, errorPage: null }
-    }
-    return null
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -88,28 +76,60 @@ class PageErrorBoundary extends Component<
       error,
       info.componentStack,
     )
-    this.setState({ errorPage: this.props.pageName })
   }
 
   render() {
-    if (this.state.hasError && this.state.errorPage === this.props.pageName) {
+    if (this.state.hasError) {
       return (
         <div
           role="alert"
           style={{
-            minHeight: 320,
+            minHeight: 360,
             display: "grid",
             placeItems: "center",
-            padding: 24,
+            padding: 32,
             color: "#475569",
-            background: "#f1f5f9",
+            background: "#f8fafc",
             textAlign: "center",
           }}
         >
-          <div>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Chức năng gặp lỗi</div>
-            <div style={{ fontSize: 13 }}>Vui lòng chọn chức năng khác hoặc tải lại trang.</div>
+          <div style={{ maxWidth: 420 }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: "#1e293b",
+                marginBottom: 8,
+              }}
+            >
+              Chức năng đang tải lại hoặc gặp sự cố
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "#64748b",
+                marginBottom: 16,
+                lineHeight: 1.5,
+              }}
+            >
+              Hệ thống đã tự động khôi phục. Bạn có thể nhấn thử lại hoặc chọn chức năng khác.
+            </div>
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              style={{
+                background: "#006b68",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "8px 20px",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Thử lại
+            </button>
           </div>
         </div>
       )
@@ -150,7 +170,8 @@ const fmtPct = (val: number | string | null | undefined): string => {
   return `${pct}%`
 }
 
-const getNumericPct = (m: Metric): number => {
+const getNumericPct = (m?: Metric | null): number => {
+  if (!m) return 0
   if (typeof m.pctHT === "number") {
     return Math.abs(m.pctHT) < 50 && m.pctHT !== 0 ? m.pctHT * 100 : m.pctHT
   }
@@ -158,7 +179,9 @@ const getNumericPct = (m: Metric): number => {
     const parsed = parseFloat(m.pctHT.replace(/%/g, ""))
     return Number.isFinite(parsed) ? parsed : 0
   }
-  return m.kh > 0 ? (m.th / m.kh) * 100 : 0
+  const kh = m.kh || 0
+  const th = m.th || 0
+  return kh > 0 ? (th / kh) * 100 : 0
 }
 
 const toNumber = (value: unknown): number => {
@@ -1053,7 +1076,7 @@ function calcWorkingDaysLeft(): number {
   return Math.max(count, 1)
 }
 
-function BieuDoPage({ members, units }: { members: Member[]; units: string[] }) {
+function BieuDoPage({ members = [], units = [] }: { members: Member[]; units: string[] }) {
   const [chartType, setChartType] = useState<ChartTabId>("compare")
   const [metric, setMetric] = useState<"hdv" | "td">("hdv")
   const [workingDays, setWorkingDays] = useState<number>(calcWorkingDaysLeft)
@@ -1063,25 +1086,25 @@ function BieuDoPage({ members, units }: { members: Member[]; units: string[] }) 
   const accentColor = metric === "hdv" ? "#006b68" : "#fdb71a"
 
   // ── Data: các tab cũ ──────────────────────────────────────────────────────
-  const compareData = members.slice(0, 20).map((m) => ({
+  const compareData = (members || []).slice(0, 20).map((m) => ({
     name: m.name,
-    ĐK: m[metric].dk,
-    KH: m[metric].kh,
-    TH: m[metric].th,
+    ĐK: m[metric]?.dk ?? 0,
+    KH: m[metric]?.kh ?? 0,
+    TH: m[metric]?.th ?? 0,
   }))
 
-  const unitData = units
+  const unitData = (units || [])
     .map((u) => {
-      const ums = members.filter((m) => m.unit === u)
+      const ums = (members || []).filter((m) => m.unit === u)
       return {
         name: u,
-        KH: ums.reduce((acc, m) => acc + m[metric].kh, 0),
-        TH: ums.reduce((acc, m) => acc + m[metric].th, 0),
+        KH: ums.reduce((acc, m) => acc + (m[metric]?.kh ?? 0), 0),
+        TH: ums.reduce((acc, m) => acc + (m[metric]?.th ?? 0), 0),
       }
     })
     .filter((d) => d.TH > 0 || d.KH > 0)
 
-  const pctData = [...members]
+  const pctData = [...(members || [])]
     .sort((a, b) => getNumericPct(b[metric]) - getNumericPct(a[metric]))
     .slice(0, 16)
     .map((m) => ({
@@ -1093,27 +1116,29 @@ function BieuDoPage({ members, units }: { members: Member[]; units: string[] }) 
   // ── Data: Còn thực hiện ───────────────────────────────────────────────────
   const conThByMember = useMemo(
     () =>
-      [...members]
-        .sort((a, b) => b[metric].conTh - a[metric].conTh)
-        .map((m) => ({
-          name: m.name,
-          fullName: m.fullName,
-          unit: m.unit,
-          "Còn TH": parseFloat(m[metric].conTh.toFixed(2)),
-        })),
+      [...(members || [])]
+        .sort((a, b) => (b[metric]?.conTh ?? 0) - (a[metric]?.conTh ?? 0))
+        .map((m) => {
+          const ct = m[metric]?.conTh ?? 0
+          return {
+            name: m.name,
+            fullName: m.fullName,
+            unit: m.unit,
+            "Còn TH": parseFloat(ct.toFixed(2)),
+          }
+        }),
     [members, metric],
   )
 
   const conThByUnit = useMemo(
     () =>
-      units
+      (units || [])
         .map((u) => {
-          const ums = members.filter((m) => m.unit === u)
+          const ums = (members || []).filter((m) => m.unit === u)
+          const total = ums.reduce((acc, m) => acc + (m[metric]?.conTh ?? 0), 0)
           return {
             name: u,
-            "Còn TH": parseFloat(
-              ums.reduce((acc, m) => acc + m[metric].conTh, 0).toFixed(2),
-            ),
+            "Còn TH": parseFloat(total.toFixed(2)),
           }
         })
         .filter((d) => d["Còn TH"] > 0)
@@ -1124,24 +1149,27 @@ function BieuDoPage({ members, units }: { members: Member[]; units: string[] }) 
   // ── Data: Phấn đấu/ngày ───────────────────────────────────────────────────
   const perDayByMember = useMemo(
     () =>
-      [...members]
-        .sort((a, b) => b[metric].conTh - a[metric].conTh)
-        .map((m) => ({
-          name: m.name,
-          fullName: m.fullName,
-          unit: m.unit,
-          "Tỷ/ngày": parseFloat((m[metric].conTh / safeDays).toFixed(4)),
-          conTh: m[metric].conTh,
-        })),
+      [...(members || [])]
+        .sort((a, b) => (b[metric]?.conTh ?? 0) - (a[metric]?.conTh ?? 0))
+        .map((m) => {
+          const ct = m[metric]?.conTh ?? 0
+          return {
+            name: m.name,
+            fullName: m.fullName,
+            unit: m.unit,
+            "Tỷ/ngày": parseFloat((ct / safeDays).toFixed(4)),
+            conTh: ct,
+          }
+        }),
     [members, metric, safeDays],
   )
 
   const perDayByUnit = useMemo(
     () =>
-      units
+      (units || [])
         .map((u) => {
-          const ums = members.filter((m) => m.unit === u)
-          const total = ums.reduce((acc, m) => acc + m[metric].conTh, 0)
+          const ums = (members || []).filter((m) => m.unit === u)
+          const total = ums.reduce((acc, m) => acc + (m[metric]?.conTh ?? 0), 0)
           return {
             name: u,
             "Tỷ/ngày": parseFloat((total / safeDays).toFixed(4)),
@@ -2842,7 +2870,7 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
   },
 ]
 
-function Sidebar({ page, setPage, isPending }: { page: Page; setPage: (p: Page) => void; isPending?: boolean }) {
+function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
   return (
     <aside
       className="no-print"
@@ -2984,7 +3012,6 @@ function Sidebar({ page, setPage, isPending }: { page: Page; setPage: (p: Page) 
                   fontSize: 13,
                   fontWeight: isActive ? 700 : 500,
                   transition: "all 0.18s ease",
-                  opacity: isPending ? 0.65 : 1,
                   fontFamily: "'Be Vietnam Pro', sans-serif",
                 }}
                 onMouseEnter={(e) => {
@@ -3276,7 +3303,6 @@ function LoginScreen({
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
-  const [isPending, startTransition] = useTransition()
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
@@ -3460,7 +3486,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       {/* Sidebar nhận diện thương hiệu BIDV */}
-      <Sidebar page={page} setPage={navigateToPage} isPending={isPending} />
+      <Sidebar page={page} setPage={navigateToPage} />
 
       <div
         style={{
@@ -3662,25 +3688,24 @@ export default function App() {
             background: page === "xuatpdf" ? "#f8fafc" : "#f1f5f9",
           }}
         >
-          <PageErrorBoundary pageName={page}>
-            <div style={{ position: "relative", minHeight: "100%" }}>
-              {/* Tất cả pages mount 1 lần, dùng display để ẩn/hiện - tránh remount */}
-              <div style={{ display: page === "dashboard" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
+          <PageErrorBoundary key={page} pageName={page}>
+            <div className="page-fade-in" style={{ minHeight: "100%" }}>
+              {page === "dashboard" && (
                 <DashboardPage members={filteredMembers} />
-              </div>
-              <div style={{ display: page === "bieudo" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
+              )}
+              {page === "bieudo" && (
                 <BieuDoPage members={filteredMembers} units={units} />
-              </div>
-              <div style={{ display: page === "solieu" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
+              )}
+              {page === "solieu" && (
                 <SoLieuPage members={filteredMembers} units={units} />
-              </div>
-              <div style={{ display: page === "xuatpdf" ? "block" : "none", opacity: isPending ? 0.6 : 1, transition: "opacity 0.15s ease" }}>
+              )}
+              {page === "xuatpdf" && (
                 <XuatPDFPage
                   rows={sourceRows}
                   sourceName={sourceName}
                   onUploadExcel={handleExcelUpload}
                 />
-              </div>
+              )}
             </div>
           </PageErrorBoundary>
         </main>

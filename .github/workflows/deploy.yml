@@ -32,6 +32,19 @@ jobs:
         run: npm ci
       - name: Build site
         run: npm run predeploy
+      - name: Preserve previously deployed bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin gh-pages
+          while IFS= read -r asset_path; do
+            [[ -n "$asset_path" ]] || continue
+            mkdir -p "dist/$(dirname "$asset_path")"
+            git show "FETCH_HEAD:$asset_path" > "dist/$asset_path"
+          done < <(
+            git ls-tree -r --name-only FETCH_HEAD -- assets |
+              grep -E '^assets/[^/]+\.(js|css)$' || true
+          )
       - name: Preserve bundles used by cached pages
         shell: bash
         run: |

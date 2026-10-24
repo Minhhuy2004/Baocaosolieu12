@@ -3243,26 +3243,36 @@ export default function App() {
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
-  const [currentUserEmail, setCurrentUserEmail] = useState(() => {
-    if (typeof window === "undefined") return ""
+  const [recoveredAuth] = useState(() => {
+    if (typeof window === "undefined") {
+      return { authenticated: false, email: "" }
+    }
 
-    return (
-      window.localStorage.getItem("bidv-report-user") ||
-      window.sessionStorage.getItem("bidv-report-user") ||
-      ""
-    )
-  })
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window === "undefined") return false
     const isAssetRecovery = new URLSearchParams(window.location.search).has(
       "__asset_reload",
     )
-    return (
-      isAssetRecovery &&
-      (window.localStorage.getItem("bidv-report-auth") === "true" ||
-        window.sessionStorage.getItem("bidv-report-auth") === "true")
-    )
+    if (!isAssetRecovery) return { authenticated: false, email: "" }
+
+    if (window.sessionStorage.getItem("bidv-report-auth") === "true") {
+      return {
+        authenticated: true,
+        email: window.sessionStorage.getItem("bidv-report-user") || "",
+      }
+    }
+
+    if (window.localStorage.getItem("bidv-report-auth") === "true") {
+      return {
+        authenticated: true,
+        email: window.localStorage.getItem("bidv-report-user") || "",
+      }
+    }
+
+    return { authenticated: false, email: "" }
   })
+  const [currentUserEmail, setCurrentUserEmail] = useState(recoveredAuth.email)
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    recoveredAuth.authenticated,
+  )
 
   const handleLogin = (
     email: string,
@@ -3282,12 +3292,13 @@ export default function App() {
     }
 
     const storage = remember ? window.localStorage : window.sessionStorage
-    const otherStorage = remember ? window.sessionStorage : window.localStorage
 
     storage.setItem("bidv-report-auth", "true")
     storage.setItem("bidv-report-user", normalizedEmail)
-    otherStorage.removeItem("bidv-report-auth")
-    otherStorage.removeItem("bidv-report-user")
+    if (remember) {
+      window.sessionStorage.removeItem("bidv-report-auth")
+      window.sessionStorage.removeItem("bidv-report-user")
+    }
     setCurrentUserEmail(normalizedEmail)
     setIsAuthenticated(true)
     return true
@@ -3315,7 +3326,6 @@ export default function App() {
       if (window.location.href !== `${window.location.origin}${nextUrl}`) {
         window.history.replaceState({}, "", nextUrl)
       }
-      window.localStorage.setItem("bidv-report-auth", "true")
       return
     }
 
@@ -3324,10 +3334,6 @@ export default function App() {
       ? `${window.location.pathname}?${params.toString()}`
       : window.location.pathname
     window.history.replaceState({}, "", nextUrl)
-    window.localStorage.removeItem("bidv-report-auth")
-    window.localStorage.removeItem("bidv-report-user")
-    window.sessionStorage.removeItem("bidv-report-auth")
-    window.sessionStorage.removeItem("bidv-report-user")
   }, [isAuthenticated])
 
   // Load verified authentic initial data directly matching the master Excel/PDF

@@ -3033,12 +3033,12 @@ function LoginScreen({
     const remember = formData.get("remember") === "on"
 
     const isAllowedEmail =
-      /huy176098@bidv\.com\.vn$/i.test(email) ||
+      /(?:huy176098|tenso)@bidv\.com\.vn$/i.test(email) ||
       /huy176098@gmail\.com$/i.test(email)
 
     if (!isAllowedEmail) {
       setMessage(
-        "Email không hợp lệ. Vui lòng nhập huy176098@gmail.com hoặc huy176098@bidv.com.vn.",
+        "Email không hợp lệ. Vui lòng nhập huy176098@gmail.com, huy176098@bidv.com.vn hoặc tenso@bidv.com.vn.",
       )
       return
     }
@@ -3164,9 +3164,9 @@ function LoginScreen({
                 name="email"
                 type="email"
                 autoComplete="email"
-                defaultValue="huy176098@gmail.com"
-                placeholder="huy176098@gmail.com hoặc huy176098@bidv.com.vn"
-                title="Vui lòng nhập email theo định dạng huy176098@gmail.com hoặc huy176098@bidv.com.vn"
+                defaultValue="tenso@bidv.com.vn"
+                placeholder="tenso@bidv.com.vn"
+                title="Vui lòng nhập email theo định dạng tenso@bidv.com.vn"
                 required
               />
             </div>
@@ -3301,7 +3301,8 @@ export default function App() {
     const normalizedEmail = email.trim().toLowerCase()
     const normalizedPassword = password.trim()
     const isValidCredentials =
-      (normalizedEmail === "huy176098@bidv.com.vn" ||
+      (normalizedEmail === "tenso@bidv.com.vn" ||
+        normalizedEmail === "huy176098@bidv.com.vn" ||
         normalizedEmail === "huy176098@gmail.com") &&
       (normalizedPassword === "Huy2704@" ||
         normalizedPassword.toLowerCase() === "huy2704@")

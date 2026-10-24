@@ -2886,10 +2886,10 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
         borderRight: "1px solid rgba(0,0,0,0.1)",
       }}
     >
-      {/* ── PHẦN TRÊN: Logo BIDV + Nút Đăng xuất ── */}
+      {/* ── PHẦN TRÊN: Logo BIDV ── */}
       <div
         style={{
-          padding: "14px 14px 12px",
+          padding: "14px 14px",
           borderBottom: "1px solid rgba(255,255,255,0.10)",
         }}
       >
@@ -2908,77 +2908,6 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
               Hệ thống Báo cáo Số liệu
             </div>
           </div>
-        </div>
-
-        {/* Card người dùng + nút Thoát */}
-        <div
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            borderRadius: 8,
-            padding: "8px 10px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 6,
-            border: "1px solid rgba(255,255,255,0.08)",
-          }}
-        >
-          {/* Avatar + Tên */}
-          <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-            <div
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                background: "#fdb71a",
-                color: "#004b49",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 900,
-                fontSize: 13,
-                flexShrink: 0,
-              }}
-            >
-              N
-            </div>
-            <div style={{ lineHeight: 1.25, minWidth: 0, overflow: "hidden" }}>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                Nguyễn Thanh Liêm
-              </div>
-              <div style={{ fontSize: 10, color: "#bfe3e1" }}>Giám đốc CN</div>
-            </div>
-          </div>
-
-          {/* Nút Thoát */}
-          <button
-            onClick={() => {
-              if (window.confirm("Bạn có muốn đăng xuất không?")) window.location.reload()
-            }}
-            style={{
-              background: "rgba(220,38,38,0.18)",
-              border: "1px solid rgba(220,38,38,0.40)",
-              borderRadius: 5,
-              color: "#fca5a5",
-              padding: "4px 9px",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: 700,
-              flexShrink: 0,
-              whiteSpace: "nowrap",
-              fontFamily: "'Be Vietnam Pro', sans-serif",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(220,38,38,0.32)"
-              e.currentTarget.style.color = "#fff"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(220,38,38,0.18)"
-              e.currentTarget.style.color = "#fca5a5"
-            }}
-          >
-            Thoát
-          </button>
         </div>
       </div>
 

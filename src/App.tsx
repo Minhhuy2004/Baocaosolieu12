@@ -15,6 +15,10 @@ import { createPortal } from "react-dom"
 import type { WorkBook } from "xlsx"
 import initialData from "./initialData.json"
 
+const isSupabaseConfigured = Boolean(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
+)
+
 const DashboardChart = lazy(() =>
   loadChartRenderer().then((module) => ({ default: module.DashboardChart })),
 )
@@ -67,32 +71,6 @@ export type ReportRow = {
 }
 
 type Page = "dashboard" | "bieudo" | "solieu" | "xuatpdf"
-type AuthStorageName = "localStorage" | "sessionStorage"
-
-function readStoredAuth(storageName: AuthStorageName) {
-  try {
-    const storage = window[storageName]
-    if (storage.getItem("bidv-report-auth") !== "true") return null
-
-    return {
-      authenticated: true,
-      email: storage.getItem("bidv-report-user") || "",
-    }
-  } catch (error) {
-    console.warn(`Unable to read authentication from ${storageName}.`, error)
-    return null
-  }
-}
-
-function clearStoredAuth(storageName: AuthStorageName) {
-  try {
-    const storage = window[storageName]
-    storage.removeItem("bidv-report-auth")
-    storage.removeItem("bidv-report-user")
-  } catch (error) {
-    console.warn(`Unable to clear authentication from ${storageName}.`, error)
-  }
-}
 
 class PageErrorBoundary extends Component<
   { children: ReactNode; pageName: Page },
@@ -3019,38 +2997,38 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
 
 function LoginScreen({
   onLogin,
+  backendConfigured,
 }: {
-  onLogin: (email: string, password: string, remember: boolean) => boolean
+  onLogin: (
+    email: string,
+    password: string,
+    remember: boolean,
+  ) => Promise<string | null>
+  backendConfigured: boolean
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     const email = String(formData.get("email") ?? "").trim().toLowerCase()
-    const password = String(formData.get("password") ?? "").trim()
+    const password = String(formData.get("password") ?? "")
     const remember = formData.get("remember") === "on"
-
-    const isAllowedEmail =
-      /(?:huy176098|tenso)@bidv\.com\.vn$/i.test(email) ||
-      /huy176098@gmail\.com$/i.test(email)
-
-    if (!isAllowedEmail) {
-      setMessage(
-        "Email không hợp lệ. Vui lòng nhập huy176098@gmail.com, huy176098@bidv.com.vn hoặc tenso@bidv.com.vn.",
-      )
-      return
-    }
 
     if (!password) {
       setMessage("Vui lòng nhập mật khẩu để đăng nhập.")
       return
     }
 
-    const isAuthenticated = onLogin(email, password, remember)
-    if (!isAuthenticated) {
-      setMessage("Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.")
+    setIsSubmitting(true)
+    setMessage("")
+    try {
+      const errorMessage = await onLogin(email, password, remember)
+      if (errorMessage) setMessage(errorMessage)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -3166,7 +3144,6 @@ function LoginScreen({
                 autoComplete="email"
                 defaultValue="tenso@bidv.com.vn"
                 placeholder="tenso@bidv.com.vn"
-                title="Vui lòng nhập email theo định dạng tenso@bidv.com.vn"
                 required
               />
             </div>
@@ -3236,8 +3213,19 @@ function LoginScreen({
               </p>
             )}
 
-            <button type="submit" className="login-submit">
-              Đăng nhập
+            {!backendConfigured && (
+              <p className="login-message" role="alert">
+                Backend Supabase chưa được cấu hình. Hãy thêm URL và anon key
+                của dự án Supabase trước khi đăng nhập.
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="login-submit"
+              disabled={!backendConfigured || isSubmitting}
+            >
+              {isSubmitting ? "Đang xác thực..." : "Đăng nhập"}
               <svg viewBox="0 0 20 20" aria-hidden="true">
                 <path d="M4 10h12m-5-5 5 5-5 5" />
               </svg>
@@ -3270,79 +3258,126 @@ export default function App() {
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
   const [selectedCBKH, setSelectedCBKH] = useState("Tất cả")
   const [storageWarning, setStorageWarning] = useState("")
-  const [recoveredAuth] = useState(() => {
-    if (typeof window === "undefined") {
-      return { authenticated: false, email: "" }
+  const [isCheckingSession, setIsCheckingSession] =
+    useState(isSupabaseConfigured)
+  const [currentUserEmail, setCurrentUserEmail] = useState("")
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    let isActive = true
+    let unsubscribe: (() => void) | undefined
+
+    const initializeAuth = async () => {
+      try {
+        const { supabase } = await import("./lib/supabase")
+        if (!isActive) return
+        if (!supabase) {
+          setIsCheckingSession(false)
+          return
+        }
+
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (!isActive) return
+          setCurrentUserEmail(session?.user.email ?? "")
+          setIsAuthenticated(Boolean(session?.user))
+          setIsCheckingSession(false)
+        })
+        unsubscribe = () => subscription.unsubscribe()
+
+        const { data, error } = await supabase.auth.getSession()
+        if (!isActive) return
+        if (error) {
+          console.error("Unable to restore the Supabase session.", error)
+          setStorageWarning(
+            "Không thể khôi phục phiên đăng nhập. Vui lòng đăng nhập lại.",
+          )
+        }
+        setCurrentUserEmail(data.session?.user.email ?? "")
+        setIsAuthenticated(Boolean(data.session?.user))
+        setIsCheckingSession(false)
+      } catch (error) {
+        if (!isActive) return
+        console.error("Unable to check the Supabase session.", error)
+        setStorageWarning(
+          "Không thể kết nối dịch vụ xác thực. Vui lòng kiểm tra kết nối mạng và thử lại.",
+        )
+        setIsCheckingSession(false)
+      }
     }
 
-    const isAssetRecovery = new URLSearchParams(window.location.search).has(
-      "__asset_reload",
-    )
-    if (!isAssetRecovery) return { authenticated: false, email: "" }
+    if (isSupabaseConfigured) void initializeAuth()
 
-    const sessionAuth = readStoredAuth("sessionStorage")
-    if (sessionAuth) return sessionAuth
+    return () => {
+      isActive = false
+      unsubscribe?.()
+    }
+  }, [])
 
-    const rememberedAuth = readStoredAuth("localStorage")
-    if (rememberedAuth) return rememberedAuth
-
-    return { authenticated: false, email: "" }
-  })
-  const [currentUserEmail, setCurrentUserEmail] = useState(recoveredAuth.email)
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    recoveredAuth.authenticated,
-  )
-
-  const handleLogin = (
+  const handleLogin = async (
     email: string,
     password: string,
     remember: boolean,
-  ): boolean => {
+  ): Promise<string | null> => {
     const normalizedEmail = email.trim().toLowerCase()
-    const normalizedPassword = password.trim()
-    const isValidCredentials =
-      (normalizedEmail === "tenso@bidv.com.vn" ||
-        normalizedEmail === "huy176098@bidv.com.vn" ||
-        normalizedEmail === "huy176098@gmail.com") &&
-      (normalizedPassword === "Huy2704@" ||
-        normalizedPassword.toLowerCase() === "huy2704@")
-
-    if (!isValidCredentials) {
-      return false
-    }
-
-    const storageName = remember ? "localStorage" : "sessionStorage"
-    let persistenceFailed = false
     try {
-      const storage = window[storageName]
-      storage.setItem("bidv-report-auth", "true")
-      storage.setItem("bidv-report-user", normalizedEmail)
+      const {
+        consumeAuthStorageWarning,
+        setAuthRememberPreference,
+        supabase,
+      } = await import("./lib/supabase")
+      if (!supabase) {
+        return "Backend Supabase chưa được cấu hình. Hãy thêm URL và anon key của dự án trước khi đăng nhập."
+      }
+
+      setAuthRememberPreference(remember)
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      })
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          return "Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin."
+        }
+        if (error.message.includes("Email not confirmed")) {
+          return "Email chưa được xác nhận. Vui lòng kiểm tra hộp thư của bạn."
+        }
+        if (error.message.toLowerCase().includes("too many requests")) {
+          return "Bạn đã thử đăng nhập nhiều lần. Vui lòng đợi một lúc rồi thử lại."
+        }
+        console.error("Supabase sign-in failed.", error)
+        return "Đăng nhập chưa thành công. Vui lòng thử lại hoặc liên hệ quản trị viên."
+      }
+
+      setStorageWarning(
+        consumeAuthStorageWarning()
+          ? "Trình duyệt đang chặn lưu phiên. Bạn vẫn dùng được trong tab này, nhưng sẽ cần đăng nhập lại khi tải lại trang."
+          : "",
+      )
+      return null
     } catch (error) {
-      console.warn(`Unable to persist authentication in ${storageName}.`, error)
-      clearStoredAuth(storageName)
-      persistenceFailed = true
+      console.error("Unable to reach Supabase Auth.", error)
+      return "Không thể kết nối dịch vụ đăng nhập. Hãy kiểm tra mạng và thử lại."
     }
-    if (remember) {
-      clearStoredAuth("sessionStorage")
-    }
-    setStorageWarning(
-      persistenceFailed
-        ? "Trình duyệt đang chặn lưu phiên đăng nhập. Bạn vẫn có thể dùng hệ thống trong tab này, nhưng cần đăng nhập lại nếu tải lại trang."
-        : "",
-    )
-    setCurrentUserEmail(normalizedEmail)
-    setIsAuthenticated(true)
-    return true
   }
 
-  const handleLogout = () => {
-    if (typeof window === "undefined") return
+  const handleLogout = async () => {
+    try {
+      const { supabase } = await import("./lib/supabase")
+      if (!supabase) return
 
-    clearStoredAuth("localStorage")
-    clearStoredAuth("sessionStorage")
-    setStorageWarning("")
-    setCurrentUserEmail("")
-    setIsAuthenticated(false)
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error("Supabase sign-out failed.", error)
+        setStorageWarning("Không thể đăng xuất. Vui lòng thử lại.")
+        return
+      }
+      setStorageWarning("")
+    } catch (error) {
+      console.error("Unable to reach Supabase Auth while signing out.", error)
+      setStorageWarning("Không thể kết nối để đăng xuất. Vui lòng thử lại.")
+    }
   }
 
   useEffect(() => {
@@ -3462,8 +3497,30 @@ export default function App() {
     }
   }, [page])
 
+  if (isCheckingSession) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          color: "#475569",
+          background: "#eef2f7",
+          fontSize: 14,
+        }}
+      >
+        Đang kiểm tra phiên đăng nhập...
+      </main>
+    )
+  }
+
   if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLogin} />
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        backendConfigured={isSupabaseConfigured}
+      />
+    )
   }
 
   return (

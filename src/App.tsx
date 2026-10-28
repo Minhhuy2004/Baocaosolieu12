@@ -14,6 +14,7 @@
 import { createPortal } from "react-dom"
 import type { WorkBook } from "xlsx"
 import initialData from "./initialData.json"
+import { fmtPct, getNumericPct, toNumber } from "./utils/formatters"
 
 const isSupabaseConfigured = Boolean(
   import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -167,43 +168,6 @@ const fmt2 = (val: number | null | undefined): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-}
-
-const fmtPct = (val: number | string | null | undefined): string => {
-  if (val === null || val === undefined || val === "") return ""
-  if (typeof val === "string") {
-    if (val.includes("#")) return val.trim()
-    const parsed = parseFloat(val.replace(/%/g, "").replace(/,/g, ""))
-    if (isNaN(parsed)) return val
-    val = parsed
-  }
-  const pct =
-    Math.abs(val) < 50 && val !== 0 ? Math.round(val * 100) : Math.round(val)
-  return `${pct}%`
-}
-
-const getNumericPct = (m?: Metric | null): number => {
-  if (!m) return 0
-  if (typeof m.pctHT === "number") {
-    return Math.abs(m.pctHT) < 50 && m.pctHT !== 0 ? m.pctHT * 100 : m.pctHT
-  }
-  if (typeof m.pctHT === "string") {
-    const parsed = parseFloat(m.pctHT.replace(/%/g, ""))
-    return Number.isFinite(parsed) ? parsed : 0
-  }
-  const kh = m.kh || 0
-  const th = m.th || 0
-  return kh > 0 ? (th / kh) * 100 : 0
-}
-
-const toNumber = (value: unknown): number => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0
-  const normalized = String(value ?? "")
-    .replace(/,/g, "")
-    .replace(/%/g, "")
-    .trim()
-  const parsed = Number(normalized)
-  return Number.isFinite(parsed) ? parsed : 0
 }
 
 const pctColor = (p: number) =>
@@ -3412,6 +3376,18 @@ export default function App() {
   )
   const [importError, setImportError] = useState("")
   const [importSuccess, setImportSuccess] = useState("")
+  const importNoticeTimeoutRef = useRef<number | null>(null)
+  const importRequestIdRef = useRef(0)
+
+  useEffect(
+    () => () => {
+      importRequestIdRef.current += 1
+      if (importNoticeTimeoutRef.current !== null) {
+        window.clearTimeout(importNoticeTimeoutRef.current)
+      }
+    },
+    [],
+  )
 
   const units = useMemo(
     () => [...new Set(members.map((member) => member.unit))],
@@ -3425,6 +3401,14 @@ export default function App() {
     event.target.value = ""
     if (!file) return
 
+    const requestId = ++importRequestIdRef.current
+    if (importNoticeTimeoutRef.current !== null) {
+      window.clearTimeout(importNoticeTimeoutRef.current)
+      importNoticeTimeoutRef.current = null
+    }
+    setImportError("")
+    setImportSuccess("")
+
     try {
       const XLSX = await import("xlsx")
       const buffer = await file.arrayBuffer()
@@ -3437,21 +3421,30 @@ export default function App() {
         )
       }
 
+      if (requestId !== importRequestIdRef.current) return
       setMembers(parsed.members)
       setSourceRows(parsed.rows)
       setSelectedDonVi("Tất cả")
       setSelectedCBKH("Tất cả")
       setSourceName(file.name)
-      setImportError("")
       setImportSuccess(
         `Đã nạp thành công ${parsed.members.length} CBKH và ${parsed.rows.length} dòng báo cáo từ file ${file.name}!`,
       )
-      setTimeout(() => setImportSuccess(""), 6000)
+      importNoticeTimeoutRef.current = window.setTimeout(() => {
+        if (requestId !== importRequestIdRef.current) return
+        setImportSuccess("")
+        importNoticeTimeoutRef.current = null
+      }, 6000)
     } catch (error) {
+      if (requestId !== importRequestIdRef.current) return
       setImportError(
         error instanceof Error ? error.message : "Không thể đọc file Excel.",
       )
-      setTimeout(() => setImportError(""), 6000)
+      importNoticeTimeoutRef.current = window.setTimeout(() => {
+        if (requestId !== importRequestIdRef.current) return
+        setImportError("")
+        importNoticeTimeoutRef.current = null
+      }, 6000)
     }
   }
 

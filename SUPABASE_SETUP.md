@@ -26,14 +26,16 @@ and publishable/anon key. `.env.local` is ignored by Git.
 
 In the repository, open **Settings → Secrets and variables → Actions** and add
 these names under either **Variables** (recommended for public client settings)
-or **Secrets**:
+or **Secrets** to enable sign-in:
 
 - `VITE_SUPABASE_URL`: the Supabase project URL
 - `VITE_SUPABASE_ANON_KEY`: the publishable/anon key
 
-The deploy workflow checks that both values exist before building, then injects
-them into the static frontend. These values are public client configuration, not
-server secrets. Supabase authorization must be enforced by Supabase policies.
+The deploy workflow injects these values into the static frontend when they are
+configured. They are not required to build or deploy the site; without them,
+the login screen explains that Supabase is not configured and sign-in is
+unavailable. These values are public client configuration, not server secrets.
+Supabase authorization must be enforced by Supabase policies.
 
 ## Data protection scope
 

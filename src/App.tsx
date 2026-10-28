@@ -3094,7 +3094,11 @@ function LoginScreen({
             Đăng nhập để truy cập hệ thống báo cáo số liệu.
           </p>
 
-          <form className="login-form" onSubmit={handleSubmit}>
+          <form
+            className="login-form"
+            onSubmit={handleSubmit}
+            autoComplete="off"
+          >
             <label htmlFor="login-email">Email BIDV</label>
             <div className="login-input-wrap">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -3105,7 +3109,7 @@ function LoginScreen({
                 id="login-email"
                 name="email"
                 type="email"
-                autoComplete="email"
+                autoComplete="off"
                 placeholder="tenso@bidv.com.vn"
                 required
               />

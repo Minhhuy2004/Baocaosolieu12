@@ -3142,7 +3142,6 @@ function LoginScreen({
                 name="email"
                 type="email"
                 autoComplete="email"
-                defaultValue="tenso@bidv.com.vn"
                 placeholder="tenso@bidv.com.vn"
                 required
               />

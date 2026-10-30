@@ -12,6 +12,7 @@
     "format": "oxfmt"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "gh-pages": "^6.3.0",
     "react": "^19.0.0",

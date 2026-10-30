@@ -1,0 +1,63 @@
+- main [ref=e3]:
+  - region "Giới thiệu hệ thống" [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: BIDV
+      - generic [ref=e8]: NGÂN HÀNG BÁN LẺ
+    - generic [ref=e9]:
+      - generic [ref=e10]: KHÔNG GIAN LÀM VIỆC SỐ
+      - heading "Số liệu rõ ràng. Quyết định vững vàng." [level=1] [ref=e12]: Số liệu rõ ràng.Quyết định vững vàng.
+      - paragraph [ref=e13]: Theo dõi, phân tích và quản lý báo cáo huy động vốn, tín dụng khách hàng trên cùng một nền tảng.
+      - generic "Minh họa báo cáo" [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]: TỔNG QUAN BÁO CÁO
+            - strong [ref=e18]: Kết quả kinh doanh
+          - generic [ref=e19]: Tháng 10
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - generic [ref=e22]: HUY ĐỘNG VỐN
+            - strong [ref=e23]: 128,6 tỷ
+            - emphasis [ref=e24]: ↗ 12,8% so với kế hoạch
+          - generic [ref=e25]:
+            - generic [ref=e26]: TÍN DỤNG
+            - strong [ref=e27]: 96,2 tỷ
+            - emphasis [ref=e28]: ↗ 8,4% so với kế hoạch
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - generic [ref=e31]: Tiến độ thực hiện
+            - strong [ref=e32]: 82%
+          - generic [ref=e35]:
+            - generic [ref=e36]: T.07
+            - generic [ref=e37]: T.08
+            - generic [ref=e38]: T.09
+            - generic [ref=e39]: T.10
+    - generic [ref=e40]:
+      - generic [ref=e41]: © BIDV · Hệ thống báo cáo số liệu CBKH
+      - generic [ref=e42]: Kết nối an toàn
+  - region [ref=e46]:
+    - generic [ref=e47]:
+      - generic [ref=e48]: CHÀO MỪNG BẠN
+      - heading "Đăng nhập" [level=2] [ref=e54]
+      - paragraph [ref=e55]: Đăng nhập để truy cập hệ thống báo cáo số liệu.
+      - generic [ref=e56]:
+        - generic [ref=e57]: Email BIDV
+        - textbox "Email BIDV" [ref=e62]:
+          - /placeholder: tenso@bidv.com.vn
+        - generic [ref=e63]:
+          - generic [ref=e64]: Mật khẩu
+          - button "Quên mật khẩu?" [ref=e65] [cursor=pointer]
+        - generic [ref=e66]:
+          - textbox "Mật khẩu" [ref=e70]:
+            - /placeholder: Nhập mật khẩu
+          - button "Hiện mật khẩu" [ref=e71] [cursor=pointer]
+        - generic [ref=e75] [cursor=pointer]:
+          - checkbox "Ghi nhớ đăng nhập" [ref=e76]
+          - text: Ghi nhớ đăng nhập
+        - alert [ref=e80]: Backend Supabase chưa được cấu hình. Hãy thêm URL và anon key của dự án Supabase trước khi đăng nhập.
+        - button "Đăng nhập" [disabled] [ref=e81] [cursor=pointer]
+      - generic [ref=e84]:
+        - generic [aria-hidden] [ref=e85]: "?"
+        - paragraph [ref=e86]: Cần hỗ trợ truy cập?Liên hệ quản trị viên hệ thống.
+    - generic [ref=e87]:
+      - generic [ref=e88]: Hệ thống Báo cáo Số liệu CBKH
+      - generic [ref=e89]: Phiên bản 1.0

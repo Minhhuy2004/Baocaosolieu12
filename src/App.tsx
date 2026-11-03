@@ -14,11 +14,8 @@
 import { createPortal } from "react-dom"
 import type { WorkBook } from "xlsx"
 import initialData from "./initialData.json"
+import { isSupabaseConfigured } from "./lib/supabaseConfig"
 import { fmtPct, getNumericPct, toNumber } from "./utils/formatters"
-
-const isSupabaseConfigured = Boolean(
-  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
-)
 
 const DashboardChart = lazy(() =>
   loadChartRenderer().then((module) => ({ default: module.DashboardChart })),

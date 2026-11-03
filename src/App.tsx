@@ -3616,6 +3616,7 @@ export default function App() {
               onMouseLeave={(e) => (e.currentTarget.style.background = "#006b68")}
             >
               <svg
+                aria-hidden="true"
                 width="14"
                 height="14"
                 viewBox="0 0 24 24"

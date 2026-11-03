@@ -1,7 +1,8 @@
 # Supabase Auth setup
 
-The login screen uses Supabase email/password authentication. No Supabase credentials
-are committed to this repository.
+The login screen uses Supabase email/password authentication. The project URL
+and publishable key are public client configuration; no service-role key or
+user passwords are committed to this repository.
 
 ## Create the project and account
 
@@ -17,24 +18,27 @@ are committed to this repository.
 5. Copy the project URL and the publishable/anon key from **Project Settings → API**.
    Never use or publish the `service_role` key in a browser app.
 
-## Local development
+## App configuration
 
-Copy `.env.example` to `.env.local` and replace its values with the project URL
-and publishable/anon key. `.env.local` is ignored by Git.
+The app includes this project's public URL and publishable key, so sign-in can
+work on GitHub Pages without Actions variables. These values are intended to be
+public in a browser app. Never use a `service_role` key in the frontend.
 
-## GitHub Pages deployment
+For local development or a different Supabase project, copy `.env.example` to
+`.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+`.env.local` is ignored by Git.
 
-In the repository, open **Settings → Secrets and variables → Actions** and add
-these names under either **Variables** (recommended for public client settings)
-or **Secrets** to enable sign-in:
+GitHub Actions variables with those names are optional overrides; they are not
+required to deploy this project.
 
-- `VITE_SUPABASE_URL`: the Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: the publishable/anon key
+## Login requirements
 
-The deploy workflow injects these values into the static frontend when they are
-configured. They are not required to build or deploy the site; without them,
-the login screen explains that Supabase is not configured and sign-in is
-unavailable. These values are public client configuration, not server secrets.
+The app signs in with email and password. The account must exist in the
+Supabase project's **Authentication → Users** list, have a password, and be
+allowed to sign in. Email/password authentication is enabled for the project.
+If the login form reports invalid credentials, reset or set that user's
+password in Supabase; the publishable key is not a user password.
+
 Supabase authorization must be enforced by Supabase policies.
 
 ## Data protection scope

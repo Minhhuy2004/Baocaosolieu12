@@ -41,6 +41,23 @@ password in Supabase; the publishable key is not a user password.
 
 Supabase authorization must be enforced by Supabase policies.
 
+## Shared report tracking
+
+The tracking page stores report snapshots, follow-up notes, and audit records in
+Supabase. Before using these features, open **SQL Editor** in the configured
+Supabase project and run the contents of
+`supabase/migrations/20261104120000_report_tracking.sql` from this repository.
+The migration enables row-level security and grants the same access to every
+authenticated account: users can read/create report snapshots, manage notes,
+and read (but not directly modify) the audit log. Report snapshots are
+append-only. Note and report changes are written to the audit log by database
+triggers.
+
+Do not grant access to `anon`, and do not add a service-role key to the frontend.
+The app shows a setup error in the tracking page if the tables or policies are
+missing. Excel data remains usable if saving a history snapshot fails, but the
+import banner will explicitly warn that the report was not archived.
+
 ## Data protection scope
 
 This integration replaces the hard-coded demo login with real Supabase Auth. The

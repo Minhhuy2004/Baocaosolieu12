@@ -15,7 +15,9 @@ import { createPortal } from "react-dom"
 import type { WorkBook } from "xlsx"
 import initialData from "./initialData.json"
 import { isSupabaseConfigured } from "./lib/supabaseConfig"
+import { saveReportSnapshot } from "./lib/reportStore"
 import { fmtPct, getNumericPct, toNumber } from "./utils/formatters"
+import TrackingPage from "./TrackingPage"
 
 const DashboardChart = lazy(() =>
   loadChartRenderer().then((module) => ({ default: module.DashboardChart })),
@@ -68,7 +70,15 @@ export type ReportRow = {
   kind: "member" | "unit" | "manager" | "total"
 }
 
-type Page = "dashboard" | "bieudo" | "solieu" | "xuatpdf"
+type Page = "dashboard" | "bieudo" | "solieu" | "xuatpdf" | "theodoi"
+
+type PendingImport = {
+  requestId: number
+  sourceName: string
+  members: Member[]
+  rows: ReportRow[]
+  warnings: string[]
+}
 
 class PageErrorBoundary extends Component<
   { children: ReactNode; pageName: Page },
@@ -329,6 +339,54 @@ export async function parseExcelWorkbook(
   }
 
   return { members: importedMembers, rows: importedRows }
+}
+
+function validateImportedMembers(members: Member[]) {
+  const warnings: string[] = []
+  const codeCounts = new Map<string, number>()
+
+  members.forEach((member) => {
+    const code = member.code?.trim()
+    if (code) codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1)
+  })
+
+  const duplicateCodes = [...codeCounts]
+    .filter(([, count]) => count > 1)
+    .map(([code]) => code)
+  if (duplicateCodes.length) {
+    warnings.push(
+      `Có ${duplicateCodes.length} mã CBKH bị trùng: ${duplicateCodes.slice(0, 5).join(", ")}${duplicateCodes.length > 5 ? ", ..." : ""}.`,
+    )
+  }
+
+  const missingUnits = members.filter((member) => !member.unit.trim()).length
+  if (missingUnits) {
+    warnings.push(`${missingUnits} CBKH chưa được gán đơn vị.`)
+  }
+
+  const negativeValues = members.filter((member) =>
+    (["hdv", "td"] as const).some((metricName) =>
+      (
+        [
+          "dk",
+          "kh",
+          "giaoTang",
+          "th",
+          "conTh",
+          "soDk",
+          "soDauThang",
+          "soTuanTruoc",
+        ] as const
+      ).some((field) => member[metricName][field] < 0),
+    ),
+  ).length
+  if (negativeValues) {
+    warnings.push(
+      `${negativeValues} CBKH có chỉ tiêu âm; hãy kiểm tra lại trước khi xác nhận.`,
+    )
+  }
+
+  return warnings
 }
 
 // ── AGGREGATE HELPERS ─────────────────────────────────────────────────────────
@@ -2822,6 +2880,24 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
     ),
   },
   {
+    id: "theodoi",
+    label: "Theo dõi",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="M4 19V5m0 14h17" />
+        <path d="m7 15 4-4 3 2 6-7" />
+        <circle cx="20" cy="6" r="1" />
+      </svg>
+    ),
+  },
+  {
     id: "xuatpdf",
     label: "Xuất PDF",
     icon: (
@@ -3375,6 +3451,9 @@ export default function App() {
   const [sourceName, setSourceName] = useState(
     "Dữ liệu báo cáo chuẩn (SO LIEU.xlsx)",
   )
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null)
+  const [isConfirmingImport, setIsConfirmingImport] = useState(false)
+  const [trackingRefreshToken, setTrackingRefreshToken] = useState(0)
   const [importError, setImportError] = useState("")
   const [importSuccess, setImportSuccess] = useState("")
   const importNoticeTimeoutRef = useRef<number | null>(null)
@@ -3409,6 +3488,7 @@ export default function App() {
     }
     setImportError("")
     setImportSuccess("")
+    setPendingImport(null)
 
     try {
       const XLSX = await import("xlsx")
@@ -3423,19 +3503,13 @@ export default function App() {
       }
 
       if (requestId !== importRequestIdRef.current) return
-      setMembers(parsed.members)
-      setSourceRows(parsed.rows)
-      setSelectedDonVi("Tất cả")
-      setSelectedCBKH("Tất cả")
-      setSourceName(file.name)
-      setImportSuccess(
-        `Đã nạp thành công ${parsed.members.length} CBKH và ${parsed.rows.length} dòng báo cáo từ file ${file.name}!`,
-      )
-      importNoticeTimeoutRef.current = window.setTimeout(() => {
-        if (requestId !== importRequestIdRef.current) return
-        setImportSuccess("")
-        importNoticeTimeoutRef.current = null
-      }, 6000)
+      setPendingImport({
+        requestId,
+        sourceName: file.name,
+        members: parsed.members,
+        rows: parsed.rows,
+        warnings: validateImportedMembers(parsed.members),
+      })
     } catch (error) {
       if (requestId !== importRequestIdRef.current) return
       setImportError(
@@ -3447,6 +3521,56 @@ export default function App() {
         importNoticeTimeoutRef.current = null
       }, 6000)
     }
+  }
+
+  const confirmExcelImport = async () => {
+    const pending = pendingImport
+    if (
+      !pending ||
+      isConfirmingImport ||
+      pending.requestId !== importRequestIdRef.current
+    ) {
+      return
+    }
+
+    setIsConfirmingImport(true)
+    let historyWarning = ""
+    try {
+      await saveReportSnapshot(
+        pending.sourceName,
+        pending.members,
+        pending.rows,
+      )
+      setTrackingRefreshToken((token) => token + 1)
+    } catch (error) {
+      console.error(
+        "Excel was parsed but its shared history could not be saved.",
+        error,
+      )
+      historyWarning =
+        " Không lưu được lịch sử dùng chung; hãy kiểm tra migration Supabase. Chi tiết: " +
+        (error instanceof Error ? error.message : "lỗi không xác định.")
+    } finally {
+      setIsConfirmingImport(false)
+    }
+
+    if (pending.requestId !== importRequestIdRef.current) return
+    setMembers(pending.members)
+    setSourceRows(pending.rows)
+    setSelectedDonVi("Tất cả")
+    setSelectedCBKH("Tất cả")
+    setSourceName(pending.sourceName)
+    setPendingImport(null)
+    setImportSuccess(
+      `Đã nạp ${pending.members.length} CBKH và ${pending.rows.length} dòng báo cáo từ ${pending.sourceName}.`,
+    )
+    setImportError(historyWarning)
+    importNoticeTimeoutRef.current = window.setTimeout(() => {
+      if (pending.requestId !== importRequestIdRef.current) return
+      setImportSuccess("")
+      setImportError("")
+      importNoticeTimeoutRef.current = null
+    }, 10000)
   }
 
   const availableCBKH = useMemo(() => {
@@ -3549,6 +3673,7 @@ export default function App() {
               {page === "dashboard" && "Tổng quan số liệu"}
               {page === "bieudo" && "Biểu đồ phân tích"}
               {page === "solieu" && "Bảng số liệu chi tiết"}
+              {page === "theodoi" && "Theo dõi báo cáo"}
               {page === "xuatpdf" && "Mẫu xuất báo cáo PDF"}
             </div>
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 1 }}>
@@ -3758,6 +3883,15 @@ export default function App() {
               {page === "solieu" && (
                 <SoLieuPage members={filteredMembers} units={units} />
               )}
+              {page === "theodoi" && (
+                <TrackingPage
+                  members={members}
+                  visibleMembers={filteredMembers}
+                  sourceName={sourceName}
+                  currentUserEmail={currentUserEmail}
+                  refreshToken={trackingRefreshToken}
+                />
+              )}
               {page === "xuatpdf" && (
                 <XuatPDFPage
                   rows={sourceRows}
@@ -3769,6 +3903,144 @@ export default function App() {
           </PageErrorBoundary>
         </main>
       </div>
+      {pendingImport && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+            background: "rgba(15, 23, 42, 0.55)",
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="excel-preview-title"
+            style={{
+              width: "min(540px, 100%)",
+              maxHeight: "min(85vh, 700px)",
+              overflowY: "auto",
+              borderRadius: 14,
+              padding: 24,
+              background: "#fff",
+              boxShadow: "0 20px 60px rgba(15, 23, 42, 0.25)",
+            }}
+          >
+            <h2
+              id="excel-preview-title"
+              style={{ margin: "0 0 6px", fontSize: 19, color: "#0f172a" }}
+            >
+              Kiểm tra dữ liệu trước khi nạp
+            </h2>
+            <p style={{ margin: "0 0 16px", color: "#64748b", fontSize: 13 }}>
+              {pendingImport.sourceName}
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 10,
+              }}
+            >
+              {[
+                ["CBKH", pendingImport.members.length],
+                ["Dòng báo cáo", pendingImport.rows.length],
+              ].map(([label, count]) => (
+                <div
+                  key={label}
+                  style={{ borderRadius: 8, padding: 12, background: "#f1f5f9" }}
+                >
+                  <div style={{ color: "#64748b", fontSize: 12 }}>{label}</div>
+                  <strong
+                    style={{ display: "block", marginTop: 4, fontSize: 18 }}
+                  >
+                    {count}
+                  </strong>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: 16,
+                borderRadius: 8,
+                padding: 14,
+                background: pendingImport.warnings.length ? "#fffbeb" : "#ecfdf5",
+                color: pendingImport.warnings.length ? "#92400e" : "#047857",
+              }}
+            >
+              <strong style={{ fontSize: 13 }}>
+                {pendingImport.warnings.length
+                  ? `Cần kiểm tra (${pendingImport.warnings.length} cảnh báo)`
+                  : "Kiểm tra cơ bản không phát hiện vấn đề"}
+              </strong>
+              {pendingImport.warnings.length > 0 && (
+                <ul
+                  style={{
+                    margin: "8px 0 0",
+                    paddingLeft: 19,
+                    fontSize: 12,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {pendingImport.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <p
+              style={{
+                margin: "14px 0 18px",
+                color: "#64748b",
+                fontSize: 12,
+                lineHeight: 1.5,
+              }}
+            >
+              Xác nhận sẽ thay số liệu đang xem và lưu một bản lịch sử dùng chung
+              trên Supabase.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}>
+              <button
+                type="button"
+                onClick={() => setPendingImport(null)}
+                disabled={isConfirmingImport}
+                style={{
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 7,
+                  padding: "8px 13px",
+                  background: "#fff",
+                  color: "#334155",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmExcelImport()}
+                disabled={isConfirmingImport}
+                style={{
+                  border: 0,
+                  borderRadius: 7,
+                  padding: "8px 13px",
+                  background: "#006b68",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {isConfirmingImport ? "Đang lưu và nạp..." : "Xác nhận nạp"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

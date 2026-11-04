@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-import type { FormEvent } from "react"
-
 import type { Member, Metric } from "./App"
 
 import { getNumericPct } from "./utils/formatters"
@@ -126,7 +124,7 @@ function TrackingPage({
   currentUserEmail,
 
   refreshToken,
-}: {
+}: Readonly<{
   members: Member[];
 
   visibleMembers: Member[];
@@ -136,7 +134,7 @@ function TrackingPage({
   currentUserEmail: string;
 
   refreshToken: number
-}) {
+}>) {
   const [tab, setTab] = useState<TrackingTab>("history")
 
   const [metric, setMetric] = useState<MetricKey>("hdv")
@@ -261,7 +259,7 @@ function TrackingPage({
     [visibleMembers, metric],
   )
 
-  const addNote = async (event: FormEvent<HTMLFormElement>) => {
+  const addNote = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!selectedMember || !noteContent.trim()) return
@@ -417,9 +415,9 @@ function TrackingPage({
         </div>
       )}
       {isLoading ? (
-        <div role="status" style={{ ...panelStyle, color: "#64748b" }}>
+        <output style={{ ...panelStyle, display: "block", color: "#64748b" }}>
           Đang tải dữ liệu theo dõi...
-        </div>
+        </output>
       ) : (
         <>
           {tab === "history" && (
@@ -769,6 +767,10 @@ function TrackingPage({
                       note.status === "open" &&
                       note.due_date !== null &&
                       note.due_date < localDateKey(new Date())
+                    const dueDatePrefix = overdue ? "Quá hạn" : "Hạn"
+                    const dueDateText = note.due_date
+                      ? `${dueDatePrefix}: ${note.due_date}`
+                      : "Chưa đặt hạn"
 
                     return (
                       <article key={note.id} style={panelStyle}>
@@ -806,11 +808,7 @@ function TrackingPage({
                                 fontSize: 11,
                               }}
                             >
-                              {note.due_date
-                                ? `${
-                                    overdue ? "Quá hạn" : "Hạn"
-                                  }: ${note.due_date}`
-                                : "Chưa đặt hạn"}
+                              {dueDateText}
                               {" · Tạo "}
                               {dateTime(note.created_at)}
                             </span>

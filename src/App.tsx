@@ -6,13 +6,12 @@
   useMemo,
   useRef,
   useEffect,
-  useCallback,
   useTransition,
   type ErrorInfo,
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
-import type { WorkBook } from "xlsx"
+import type { WorkBook, WorkSheet } from "xlsx"
 import initialData from "./initialData.json"
 import { isSupabaseConfigured } from "./lib/supabaseConfig"
 import { saveReportSnapshot } from "./lib/reportStore"
@@ -162,7 +161,7 @@ class PageErrorBoundary extends Component<
 // ── FORMATTERS ────────────────────────────────────────────────────────────────
 
 const fmt1 = (val: number | null | undefined): string => {
-  if (val === null || val === undefined || isNaN(val)) return "0.0"
+  if (val === null || val === undefined || Number.isNaN(val)) return "0.0"
   return val.toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
@@ -170,15 +169,18 @@ const fmt1 = (val: number | null | undefined): string => {
 }
 
 const fmt2 = (val: number | null | undefined): string => {
-  if (val === null || val === undefined || isNaN(val)) return "0.00"
+  if (val === null || val === undefined || Number.isNaN(val)) return "0.00"
   return val.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
 }
 
-const pctColor = (p: number) =>
-  p >= 100 ? "#059669" : p >= 70 ? "#d97706" : "#dc2626"
+const pctColor = (p: number) => {
+  if (p >= 100) return "#059669"
+  if (p >= 70) return "#d97706"
+  return "#dc2626"
+}
 const diffColor = (n: number) => (n >= 0 ? "#059669" : "#dc2626")
 
 const isUnitRow = (name: string) => /^(P\.|PGD\s)/i.test(name.trim())
@@ -189,156 +191,148 @@ const getMemberId = (member: Member, index: number) =>
 
 // ── ROBUST EXCEL PARSER ───────────────────────────────────────────────────────
 
+type ExcelHeader = { rowIndex: number; hdvCol: number; tdCol: number }
+
+function findExcelHeader(rows: unknown[][]): ExcelHeader | null {
+  for (let index = 0; index < Math.min(rows.length, 10); index++) {
+    const row = rows[index]
+    if (!Array.isArray(row)) continue
+    const hdvCol = row.findIndex((cell) => /h[dđ]v\s*[dđ]k/i.test(String(cell)))
+    if (hdvCol < 0) continue
+    const foundTdCol = row.findIndex((cell) => /t[dđ]\s*[dđ]k/i.test(String(cell)))
+    return { rowIndex: index, hdvCol, tdCol: foundTdCol < 0 ? hdvCol + 9 : foundTdCol }
+  }
+  return null
+}
+
+function parseExcelMetric(row: unknown[], startCol: number): Metric {
+  const rawPct = row[startCol + 8]
+  let pctHT: Metric["pctHT"] = null
+  if (rawPct !== "" && rawPct !== null && rawPct !== undefined) {
+    pctHT = typeof rawPct === "string" && rawPct.includes("#")
+      ? rawPct.trim()
+      : toNumber(rawPct)
+  }
+  return {
+    dk: toNumber(row[startCol]),
+    kh: toNumber(row[startCol + 1]),
+    giaoTang: toNumber(row[startCol + 2]),
+    th: toNumber(row[startCol + 3]),
+    conTh: toNumber(row[startCol + 4]),
+    soDk: toNumber(row[startCol + 5]),
+    soDauThang: toNumber(row[startCol + 6]),
+    soTuanTruoc: toNumber(row[startCol + 7]),
+    pctHT,
+  }
+}
+
+function getExcelFullName(row: unknown[], rawName: string): string {
+  const fullNameCell = row[22]
+  if (typeof fullNameCell === "string" && fullNameCell.trim()) return fullNameCell.trim()
+  const lastCell = row.at(-1)
+  if (lastCell && typeof lastCell === "string" && lastCell.length > rawName.length) {
+    return lastCell.trim()
+  }
+  return rawName
+}
+
+function flushExcelMembers(
+  buffer: Member[],
+  members: Member[],
+  reportRows: ReportRow[],
+): void {
+  buffer.forEach((member) => {
+    members.push(member)
+    reportRows.push({ ...member, kind: "member" })
+  })
+  buffer.length = 0
+}
+
+function appendExcelRow(
+  rawName: string,
+  code: string,
+  fullName: string,
+  hdv: Metric,
+  td: Metric,
+  buffer: Member[],
+  output: { members: Member[]; reportRows: ReportRow[] },
+): void {
+  if (isUnitRow(rawName)) {
+    buffer.forEach((member) => { member.unit = rawName })
+    flushExcelMembers(buffer, output.members, output.reportRows)
+    output.reportRows.push({ code, name: rawName, fullName: rawName, unit: rawName, hdv, td, kind: "unit" })
+    return
+  }
+  if (isManagerRow(rawName) || isTotalRow(rawName)) {
+    output.reportRows.push({
+      code,
+      name: rawName,
+      fullName: rawName,
+      unit: rawName,
+      hdv,
+      td,
+      kind: isManagerRow(rawName) ? "manager" : "total",
+    })
+    return
+  }
+  buffer.push({ code, name: rawName, fullName, unit: "", hdv, td })
+}
+
+function parseExcelSheet(
+  sheet: WorkSheet,
+  sheetName: string,
+  XLSX: typeof import("xlsx"),
+  members: Member[],
+  reportRows: ReportRow[],
+): void {
+  const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" })
+  if (!data || data.length < 2) return
+  const header = findExcelHeader(data)
+  if (!header) return
+
+  const nameCol = header.hdvCol >= 2 ? 1 : 0
+  const codeCol = header.hdvCol >= 2 ? 0 : -1
+  const buffer: Member[] = []
+  const output = { members, reportRows }
+  for (let index = header.rowIndex + 1; index < data.length; index++) {
+    const row = data[index]
+    if (!Array.isArray(row) || !row.length) continue
+    const nameValue = row[nameCol]
+    const rawName = (typeof nameValue === "string" || typeof nameValue === "number" ? String(nameValue) : "").trim()
+    if (!rawName || rawName.toLowerCase() === "tên") continue
+    const codeValue = codeCol >= 0 ? row[codeCol] : ""
+    const code = typeof codeValue === "string" || typeof codeValue === "number" ? String(codeValue).trim() : ""
+    appendExcelRow(
+      rawName,
+      code,
+      getExcelFullName(row, rawName),
+      parseExcelMetric(row, header.hdvCol),
+      parseExcelMetric(row, header.tdCol),
+      buffer,
+      output,
+    )
+  }
+
+  buffer.forEach((member) => {
+    if (!member.unit) member.unit = sheetName
+  })
+  flushExcelMembers(buffer, members, reportRows)
+}
+
 export async function parseExcelWorkbook(
   workbook: WorkBook,
 ): Promise<{ members: Member[]; rows: ReportRow[] }> {
   const XLSX = await import("xlsx")
-  const importedMembers: Member[] = []
-  const importedRows: ReportRow[] = []
+  const members: Member[] = []
+  const rows: ReportRow[] = []
 
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName]
     if (!sheet) continue
-
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-      header: 1,
-      defval: "",
-    })
-    if (!rows || rows.length < 2) continue
-
-    let headerIdx = -1
-    let hdvDkCol = -1
-    let tdDkCol = -1
-
-    for (let r = 0; r < Math.min(rows.length, 10); r++) {
-      const row = rows[r]
-      if (!Array.isArray(row)) continue
-      const hdvIdx = row.findIndex((c) => /h[dđ]v\s*[dđ]k/i.test(String(c)))
-      if (hdvIdx >= 0) {
-        headerIdx = r
-        hdvDkCol = hdvIdx
-        tdDkCol = row.findIndex((c) => /t[dđ]\s*[dđ]k/i.test(String(c)))
-        break
-      }
-    }
-
-    if (headerIdx < 0 || hdvDkCol < 0) continue
-    if (tdDkCol < 0) tdDkCol = hdvDkCol + 9
-
-    const nameCol = hdvDkCol >= 2 ? 1 : 0
-    const codeCol = hdvDkCol >= 2 ? 0 : -1
-
-    let memberBuffer: Member[] = []
-
-    for (let r = headerIdx + 1; r < rows.length; r++) {
-      const row = rows[r]
-      if (!Array.isArray(row) || !row.length) continue
-
-      const rawName = String(row[nameCol] ?? "").trim()
-      if (!rawName || rawName.toLowerCase() === "tên") continue
-
-      let fullName = rawName
-      if (row[22] && String(row[22]).trim()) {
-        fullName = String(row[22]).trim()
-      } else if (
-        row[row.length - 1] &&
-        typeof row[row.length - 1] === "string" &&
-        String(row[row.length - 1]).length > rawName.length
-      ) {
-        fullName = String(row[row.length - 1]).trim()
-      }
-
-      const parseMetric = (startCol: number): Metric => {
-        const dk = toNumber(row[startCol])
-        const kh = toNumber(row[startCol + 1])
-        const giaoTang = toNumber(row[startCol + 2])
-        const th = toNumber(row[startCol + 3])
-        const conTh = toNumber(row[startCol + 4])
-        const soDk = toNumber(row[startCol + 5])
-        const soDauThang = toNumber(row[startCol + 6])
-        const soTuanTruoc = toNumber(row[startCol + 7])
-
-        const rawPct = row[startCol + 8]
-        let pctHT: number | string | null = null
-        if (rawPct !== "" && rawPct !== null && rawPct !== undefined) {
-          if (typeof rawPct === "string" && rawPct.includes("#")) {
-            pctHT = rawPct.trim()
-          } else {
-            pctHT = toNumber(rawPct)
-          }
-        }
-        return {
-          dk,
-          kh,
-          giaoTang,
-          th,
-          conTh,
-          soDk,
-          soDauThang,
-          soTuanTruoc,
-          pctHT,
-        }
-      }
-
-      const hdv = parseMetric(hdvDkCol)
-      const td = parseMetric(tdDkCol)
-      const code = codeCol >= 0 ? String(row[codeCol] ?? "").trim() : ""
-
-      if (isUnitRow(rawName)) {
-        const unitName = rawName
-        memberBuffer.forEach((m) => {
-          m.unit = unitName
-          importedMembers.push(m)
-          importedRows.push({ ...m, kind: "member" })
-        })
-        memberBuffer = []
-        importedRows.push({
-          code,
-          name: unitName,
-          fullName: unitName,
-          unit: unitName,
-          hdv,
-          td,
-          kind: "unit",
-        })
-      } else if (isManagerRow(rawName)) {
-        importedRows.push({
-          code,
-          name: rawName,
-          fullName: rawName,
-          unit: rawName,
-          hdv,
-          td,
-          kind: "manager",
-        })
-      } else if (isTotalRow(rawName)) {
-        importedRows.push({
-          code,
-          name: rawName,
-          fullName: rawName,
-          unit: rawName,
-          hdv,
-          td,
-          kind: "total",
-        })
-      } else {
-        memberBuffer.push({ code, name: rawName, fullName, unit: "", hdv, td })
-      }
-    }
-
-    if (memberBuffer.length) {
-      memberBuffer.forEach((m) => {
-        if (!m.unit) m.unit = sheetName
-        importedMembers.push(m)
-        importedRows.push({ ...m, kind: "member" })
-      })
-      memberBuffer = []
-    }
-
-    if (importedMembers.length > 0) break
+    parseExcelSheet(sheet, sheetName, XLSX, members, rows)
+    if (members.length > 0) break
   }
-
-  return { members: importedMembers, rows: importedRows }
+  return { members, rows }
 }
 
 function validateImportedMembers(members: Member[]) {
@@ -416,13 +410,13 @@ function KPICard({
   sub,
   subColor,
   accent,
-}: {
+}: Readonly<{
   label: string
   value: string
   sub?: string
   subColor?: string
   accent: string
-}) {
+}>) {
   return (
     <div
       style={{
@@ -474,7 +468,7 @@ function KPICard({
   )
 }
 
-function PctBar({ pct }: { pct: number }) {
+function PctBar({ pct }: { readonly pct: number }) {
   const color = pctColor(pct)
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -513,7 +507,7 @@ function PctBar({ pct }: { pct: number }) {
   )
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children }: { readonly children: React.ReactNode }) {
   return (
     <div
       style={{
@@ -538,12 +532,12 @@ function FilterBar({
   availableCBKH,
   units,
 }: {
-  selectedDonVi: string
-  setSelectedDonVi: (v: string) => void
-  selectedCBKH: string
-  setSelectedCBKH: (v: string) => void
-  availableCBKH: { id: string; label: string }[]
-  units: string[]
+  readonly selectedDonVi: string
+  readonly setSelectedDonVi: (v: string) => void
+  readonly selectedCBKH: string
+  readonly setSelectedCBKH: (v: string) => void
+  readonly availableCBKH: { id: string; label: string }[]
+  readonly units: string[]
 }) {
   const sel: React.CSSProperties = {
     border: "1px solid #d1d5db",
@@ -611,10 +605,9 @@ function FilterBar({
   )
 }
 
-function ChartLoadingPlaceholder({ height }: { height: number }) {
+function ChartLoadingPlaceholder({ height }: { readonly height: number }) {
   return (
-    <div
-      role="status"
+    <output
       aria-label="Đang tải biểu đồ"
       style={{
         height,
@@ -626,13 +619,13 @@ function ChartLoadingPlaceholder({ height }: { height: number }) {
       }}
     >
       Đang tải biểu đồ...
-    </div>
+    </output>
   )
 }
 
 // ── DASHBOARD PAGE ────────────────────────────────────────────────────────────
 
-function DashboardPage({ members }: { members: Member[] }) {
+function DashboardPage({ members }: { readonly members: Member[] }) {
   const [tab, setTab] = useState<"hdv" | "td">("hdv")
   const [shouldRenderCharts, setShouldRenderCharts] = useState(false)
 
@@ -932,6 +925,18 @@ function DashboardPage({ members }: { members: Member[] }) {
             <tbody>
               {members.map((m, i) => {
                 const d = m[tab]
+                const metricValues: [keyof Metric, number][] = [
+                  ["dk", d.dk],
+                  ["kh", d.kh],
+                  ["giaoTang", d.giaoTang],
+                  ["th", d.th],
+                  ["conTh", d.conTh],
+                ]
+                const previousValues: [keyof Metric, number][] = [
+                  ["soDk", d.soDk],
+                  ["soDauThang", d.soDauThang],
+                  ["soTuanTruoc", d.soTuanTruoc],
+                ]
                 return (
                   <tr
                     key={`${m.name}-${i}`}
@@ -981,9 +986,9 @@ function DashboardPage({ members }: { members: Member[] }) {
                         {m.unit}
                       </span>
                     </td>
-                    {[d.dk, d.kh, d.giaoTang, d.th, d.conTh].map((v, vi) => (
+                    {metricValues.map(([key, v]) => (
                       <td
-                        key={vi}
+                        key={key}
                         className="mono"
                         style={{
                           padding: "9px 12px",
@@ -995,9 +1000,9 @@ function DashboardPage({ members }: { members: Member[] }) {
                         {fmt1(v)}
                       </td>
                     ))}
-                    {[d.soDk, d.soDauThang, d.soTuanTruoc].map((v, vi) => (
+                    {previousValues.map(([key, v]) => (
                       <td
-                        key={vi}
+                        key={key}
                         className="mono"
                         style={{
                           padding: "9px 12px",
@@ -1042,29 +1047,20 @@ function DashboardPage({ members }: { members: Member[] }) {
                 >
                   TỔNG CỘNG ({members.length} CBKH)
                 </td>
-                {[
-                  sumMetric(members, tab, "dk"),
-                  sumMetric(members, tab, "kh"),
-                  sumMetric(members, tab, "giaoTang"),
-                  sumMetric(members, tab, "th"),
-                  sumMetric(members, tab, "conTh"),
-                  sumMetric(members, tab, "soDk"),
-                  sumMetric(members, tab, "soDauThang"),
-                  sumMetric(members, tab, "soTuanTruoc"),
-                ].map((v, i) => (
+                {getSummaryMetrics(members, tab).map(({ field, value }) => (
                   <td
-                    key={i}
+                    key={field}
                     className="mono"
                     style={{
                       padding: "11px 12px",
                       fontSize: 12,
                       fontWeight: 800,
                       textAlign: "right",
-                      color: i >= 5 ? (v >= 0 ? "#6ee7b7" : "#fca5a5") : "#fff",
+                      color: getSummaryMetricColor(field, value),
                     }}
                   >
-                    {i >= 5 && v >= 0 ? "+" : ""}
-                    {fmt1(v)}
+                    {field.startsWith("so") && value >= 0 ? "+" : ""}
+                    {fmt1(value)}
                   </td>
                 ))}
                 <td
@@ -1091,6 +1087,154 @@ function DashboardPage({ members }: { members: Member[] }) {
 // ── BIỂU ĐỒ PAGE ──────────────────────────────────────────────────────────────
 
 type ChartTabId = "compare" | "unit" | "pct" | "conth" | "perday"
+type ChartMetric = "hdv" | "td"
+
+function buildCompareData(members: Member[], metric: ChartMetric) {
+  return members.slice(0, 20).map((member) => ({
+    name: member.name,
+    ĐK: member[metric].dk,
+    KH: member[metric].kh,
+    TH: member[metric].th,
+  }))
+}
+
+function buildUnitData(members: Member[], units: string[], metric: ChartMetric) {
+  return units
+    .map((unit) => {
+      const unitMembers = members.filter((member) => member.unit === unit)
+      return {
+        name: unit,
+        KH: unitMembers.reduce((sum, member) => sum + member[metric].kh, 0),
+        TH: unitMembers.reduce((sum, member) => sum + member[metric].th, 0),
+      }
+    })
+    .filter((data) => data.TH > 0 || data.KH > 0)
+}
+
+function buildPctData(members: Member[], metric: ChartMetric) {
+  return [...members]
+    .sort((a, b) => getNumericPct(b[metric]) - getNumericPct(a[metric]))
+    .slice(0, 16)
+    .map((member) => ({
+      name: member.name,
+      fullName: member.fullName,
+      "% HT": Number.parseFloat(getNumericPct(member[metric]).toFixed(1)),
+    }))
+}
+
+function buildConThByMember(members: Member[], metric: ChartMetric) {
+  return [...members]
+    .sort((a, b) => b[metric].conTh - a[metric].conTh)
+    .map((member) => ({
+      name: member.name,
+      fullName: member.fullName,
+      unit: member.unit,
+      "Còn TH": Number.parseFloat(member[metric].conTh.toFixed(2)),
+    }))
+}
+
+function buildConThByUnit(members: Member[], units: string[], metric: ChartMetric) {
+  return units
+    .map((unit) => {
+      const total = members
+        .filter((member) => member.unit === unit)
+        .reduce((sum, member) => sum + member[metric].conTh, 0)
+      return { name: unit, "Còn TH": Number.parseFloat(total.toFixed(2)) }
+    })
+    .filter((data) => data["Còn TH"] > 0)
+    .sort((a, b) => b["Còn TH"] - a["Còn TH"])
+}
+
+function buildPerDayByMember(
+  members: Member[],
+  metric: ChartMetric,
+  safeDays: number,
+) {
+  return [...members]
+    .sort((a, b) => b[metric].conTh - a[metric].conTh)
+    .map((member) => ({
+      name: member.name,
+      fullName: member.fullName,
+      unit: member.unit,
+      "Tỷ/ngày": Number.parseFloat(
+        (member[metric].conTh / safeDays).toFixed(4),
+      ),
+      conTh: member[metric].conTh,
+    }))
+}
+
+function buildPerDayByUnit(
+  members: Member[],
+  units: string[],
+  metric: ChartMetric,
+  safeDays: number,
+) {
+  return units
+    .map((unit) => {
+      const total = members
+        .filter((member) => member.unit === unit)
+        .reduce((sum, member) => sum + member[metric].conTh, 0)
+      return {
+        name: unit,
+        "Tỷ/ngày": Number.parseFloat((total / safeDays).toFixed(4)),
+        conTh: total,
+      }
+    })
+    .filter((data) => data.conTh > 0)
+    .sort((a, b) => b["Tỷ/ngày"] - a["Tỷ/ngày"])
+}
+
+function getChartTitle(chartType: ChartTabId, groupByUnit: boolean) {
+  switch (chartType) {
+    case "compare":
+      return "So sánh ĐK / KH / TH theo CBKH"
+    case "unit":
+      return "KH và TH theo đơn vị"
+    case "pct":
+      return "% Hoàn thành kế hoạch (xếp hạng)"
+    case "conth":
+      return `Số còn thực hiện ${groupByUnit ? "theo đơn vị" : "theo từng CBKH"}`
+    case "perday":
+      return `Chỉ tiêu phấn đấu mỗi ngày ${groupByUnit ? "theo đơn vị" : "theo CBKH"}`
+  }
+}
+
+function getRankColor(rank: number) {
+  if (rank === 0) return "#dc2626"
+  if (rank === 1) return "#d97706"
+  return "#374151"
+}
+
+function getSummaryMetricColor(field: keyof Metric, value: number) {
+  if (field !== "soDk" && field !== "soDauThang" && field !== "soTuanTruoc") {
+    return "#fff"
+  }
+  return value >= 0 ? "#6ee7b7" : "#fca5a5"
+}
+
+function getSummaryMetrics(members: Member[], metric: ChartMetric) {
+  const fields: (keyof Metric)[] = [
+    "dk",
+    "kh",
+    "giaoTang",
+    "th",
+    "conTh",
+    "soDk",
+    "soDauThang",
+    "soTuanTruoc",
+  ]
+  return fields.map((field) => ({
+    field,
+    value: sumMetric(members, metric, field),
+  }))
+}
+
+function getReportRowColors(kind: ReportRow["kind"]) {
+  if (kind === "total") return { background: "#ffff00", color: "#075b64" }
+  if (kind === "manager") return { background: "#088f8f", color: "#ffffff" }
+  if (kind === "unit") return { background: "#00b074", color: "#ffffff" }
+  return { background: undefined, color: undefined }
+}
 
 /** Tính số ngày làm việc (Thứ 2–6) còn lại từ ngày mai đến 31/12 của năm hiện tại. */
 function calcWorkingDaysLeft(): number {
@@ -1107,109 +1251,29 @@ function calcWorkingDaysLeft(): number {
   return Math.max(count, 1)
 }
 
-function BieuDoPage({ members = [], units = [] }: { members: Member[]; units: string[] }) {
+function BieuDoPage({
+  members = [],
+  units = [],
+}: Readonly<{ members: Member[]; units: string[] }>) {
   const [chartType, setChartType] = useState<ChartTabId>("compare")
-  const [metric, setMetric] = useState<"hdv" | "td">("hdv")
+  const [metric, setMetric] = useState<ChartMetric>("hdv")
   const [workingDays, setWorkingDays] = useState<number>(calcWorkingDaysLeft)
   const [groupByUnit, setGroupByUnit] = useState<boolean>(false)
 
   const safeDays = Math.max(workingDays, 1)
   const accentColor = metric === "hdv" ? "#006b68" : "#fdb71a"
 
-  // ── Data: các tab cũ ──────────────────────────────────────────────────────
-  const compareData = (members || []).slice(0, 20).map((m) => ({
-    name: m.name,
-    ĐK: m[metric]?.dk ?? 0,
-    KH: m[metric]?.kh ?? 0,
-    TH: m[metric]?.th ?? 0,
-  }))
-
-  const unitData = (units || [])
-    .map((u) => {
-      const ums = (members || []).filter((m) => m.unit === u)
-      return {
-        name: u,
-        KH: ums.reduce((acc, m) => acc + (m[metric]?.kh ?? 0), 0),
-        TH: ums.reduce((acc, m) => acc + (m[metric]?.th ?? 0), 0),
-      }
-    })
-    .filter((d) => d.TH > 0 || d.KH > 0)
-
-  const pctData = [...(members || [])]
-    .sort((a, b) => getNumericPct(b[metric]) - getNumericPct(a[metric]))
-    .slice(0, 16)
-    .map((m) => ({
-      name: m.name,
-      fullName: m.fullName,
-      "% HT": parseFloat(getNumericPct(m[metric]).toFixed(1)),
-    }))
-
-  // ── Data: Còn thực hiện ───────────────────────────────────────────────────
-  const conThByMember = useMemo(
-    () =>
-      [...(members || [])]
-        .sort((a, b) => (b[metric]?.conTh ?? 0) - (a[metric]?.conTh ?? 0))
-        .map((m) => {
-          const ct = m[metric]?.conTh ?? 0
-          return {
-            name: m.name,
-            fullName: m.fullName,
-            unit: m.unit,
-            "Còn TH": parseFloat(ct.toFixed(2)),
-          }
-        }),
-    [members, metric],
-  )
-
-  const conThByUnit = useMemo(
-    () =>
-      (units || [])
-        .map((u) => {
-          const ums = (members || []).filter((m) => m.unit === u)
-          const total = ums.reduce((acc, m) => acc + (m[metric]?.conTh ?? 0), 0)
-          return {
-            name: u,
-            "Còn TH": parseFloat(total.toFixed(2)),
-          }
-        })
-        .filter((d) => d["Còn TH"] > 0)
-        .sort((a, b) => b["Còn TH"] - a["Còn TH"]),
-    [units, members, metric],
-  )
-
-  // ── Data: Phấn đấu/ngày ───────────────────────────────────────────────────
-  const perDayByMember = useMemo(
-    () =>
-      [...(members || [])]
-        .sort((a, b) => (b[metric]?.conTh ?? 0) - (a[metric]?.conTh ?? 0))
-        .map((m) => {
-          const ct = m[metric]?.conTh ?? 0
-          return {
-            name: m.name,
-            fullName: m.fullName,
-            unit: m.unit,
-            "Tỷ/ngày": parseFloat((ct / safeDays).toFixed(4)),
-            conTh: ct,
-          }
-        }),
-    [members, metric, safeDays],
-  )
-
-  const perDayByUnit = useMemo(
-    () =>
-      (units || [])
-        .map((u) => {
-          const ums = (members || []).filter((m) => m.unit === u)
-          const total = ums.reduce((acc, m) => acc + (m[metric]?.conTh ?? 0), 0)
-          return {
-            name: u,
-            "Tỷ/ngày": parseFloat((total / safeDays).toFixed(4)),
-            conTh: total,
-          }
-        })
-        .filter((d) => d.conTh > 0)
-        .sort((a, b) => b["Tỷ/ngày"] - a["Tỷ/ngày"]),
-    [units, members, metric, safeDays],
+  const { compareData, unitData, pctData, conThByMember, conThByUnit, perDayByMember, perDayByUnit } = useMemo(
+    () => ({
+      compareData: buildCompareData(members, metric),
+      unitData: buildUnitData(members, units, metric),
+      pctData: buildPctData(members, metric),
+      conThByMember: buildConThByMember(members, metric),
+      conThByUnit: buildConThByUnit(members, units, metric),
+      perDayByMember: buildPerDayByMember(members, metric, safeDays),
+      perDayByUnit: buildPerDayByUnit(members, units, metric, safeDays),
+    }),
+    [members, metric, safeDays, units],
   )
 
   // ── Active data (dựa vào groupByUnit toggle) ──────────────────────────────
@@ -1320,7 +1384,7 @@ function BieuDoPage({ members = [], units = [] }: { members: Member[]; units: st
                 max={365}
                 value={workingDays}
                 onChange={(e) =>
-                  setWorkingDays(Math.max(1, parseInt(e.target.value) || 1))
+                  setWorkingDays(Math.max(1, Number.parseInt(e.target.value) || 1))
                 }
                 style={{
                   width: 52,
@@ -1403,13 +1467,12 @@ function BieuDoPage({ members = [], units = [] }: { members: Member[]; units: st
                   fontWeight: 700,
                   background:
                     metric === t
-                      ? t === "hdv"
-                        ? "#006b68"
-                        : "#fdb71a"
+                      ? { hdv: "#006b68", td: "#fdb71a" }[t]
                       : "transparent",
-                  color: metric === t
-                    ? t === "hdv" ? "#fff" : "#1a1a1a"
-                    : "#64748b",
+                  color:
+                    metric === t
+                      ? { hdv: "#fff", td: "#1a1a1a" }[t]
+                      : "#64748b",
                   transition: "all 0.15s",
                 }}
               >
@@ -1432,15 +1495,7 @@ function BieuDoPage({ members = [], units = [] }: { members: Member[]; units: st
         <div style={{ paddingLeft: 12, marginBottom: 16 }}>
           <SectionTitle>
             {metric === "hdv" ? "HUY ĐỘNG VỐN" : "TÍN DỤNG"} –{" "}
-            {chartType === "compare"
-              ? "So sánh ĐK / KH / TH theo CBKH"
-              : chartType === "unit"
-                ? "KH và TH theo đơn vị"
-                : chartType === "pct"
-                  ? "% Hoàn thành kế hoạch (xếp hạng)"
-                  : chartType === "conth"
-                    ? `Số còn thực hiện ${groupByUnit ? "theo đơn vị" : "theo từng CBKH"}`
-                    : `Chỉ tiêu phấn đấu mỗi ngày ${groupByUnit ? "theo đơn vị" : "theo CBKH"}`}
+            {getChartTitle(chartType, groupByUnit)}
           </SectionTitle>
           <div style={{ fontSize: 12, color: "#9ca3af" }}>
             {chartType === "compare" && "Đơn vị: tỷ đồng — Top 20 CBKH"}
@@ -1711,7 +1766,7 @@ function BieuDoPage({ members = [], units = [] }: { members: Member[]; units: st
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
-                    color: i === 0 ? "#dc2626" : i === 1 ? "#d97706" : "#374151",
+                    color: getRankColor(i),
                   }}
                 >
                   {i + 1}. {d.name}
@@ -1738,7 +1793,10 @@ function BieuDoPage({ members = [], units = [] }: { members: Member[]; units: st
 
 // ── SỐ LIỆU PAGE ──────────────────────────────────────────────────────────────
 
-function SoLieuPage({ members, units }: { members: Member[]; units: string[] }) {
+function SoLieuPage({
+  members,
+  units,
+}: Readonly<{ members: Member[]; units: string[] }>) {
   const [tab, setTab] = useState<"hdv" | "td">("hdv")
 
   return (
@@ -1900,30 +1958,20 @@ function SoLieuPage({ members, units }: { members: Member[]; units: string[] }) 
                     >
                       {unit}
                     </td>
-                    {[
-                      sumMetric(ums, tab, "dk"),
-                      sumMetric(ums, tab, "kh"),
-                      sumMetric(ums, tab, "giaoTang"),
-                      sumMetric(ums, tab, "th"),
-                      sumMetric(ums, tab, "conTh"),
-                      sumMetric(ums, tab, "soDk"),
-                      sumMetric(ums, tab, "soDauThang"),
-                      sumMetric(ums, tab, "soTuanTruoc"),
-                    ].map((v, i) => (
+                    {getSummaryMetrics(ums, tab).map(({ field, value }) => (
                       <td
-                        key={i}
+                        key={field}
                         className="mono"
                         style={{
                           padding: "8px 12px",
                           fontSize: 12,
                           fontWeight: 800,
                           textAlign: "right",
-                          color:
-                            i >= 5 ? (v >= 0 ? "#6ee7b7" : "#fca5a5") : "#fff",
+                          color: getSummaryMetricColor(field, value),
                         }}
                       >
-                        {i >= 5 && v >= 0 ? "+" : ""}
-                        {fmt1(v)}
+                        {field.startsWith("so") && value >= 0 ? "+" : ""}
+                        {fmt1(value)}
                       </td>
                     ))}
                     <td
@@ -1943,9 +1991,10 @@ function SoLieuPage({ members, units }: { members: Member[]; units: string[] }) 
 
                 const memberRows = ums.map((m, i) => {
                   const d = m[tab]
+                  const memberKey = m.code?.trim() || `${m.name}-${m.fullName}`
                   return (
                     <tr
-                      key={`${unit}-${m.name}-${i}`}
+                      key={`${unit}-${memberKey}`}
                       style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}
                     >
                       <td
@@ -1978,9 +2027,17 @@ function SoLieuPage({ members, units }: { members: Member[]; units: string[] }) 
                       >
                         {m.unit}
                       </td>
-                      {[d.dk, d.kh, d.giaoTang, d.th, d.conTh].map((v, vi) => (
+                      {(
+                        [
+                          ["dk", d.dk],
+                          ["kh", d.kh],
+                          ["giaoTang", d.giaoTang],
+                          ["th", d.th],
+                          ["conTh", d.conTh],
+                        ] as [keyof Metric, number][]
+                      ).map(([field, value]) => (
                         <td
-                          key={vi}
+                          key={field}
                           className="mono"
                           style={{
                             padding: "9px 12px",
@@ -1989,23 +2046,29 @@ function SoLieuPage({ members, units }: { members: Member[]; units: string[] }) 
                             color: "#111827",
                           }}
                         >
-                          {fmt1(v)}
+                          {fmt1(value)}
                         </td>
                       ))}
-                      {[d.soDk, d.soDauThang, d.soTuanTruoc].map((v, vi) => (
+                      {(
+                        [
+                          ["soDk", d.soDk],
+                          ["soDauThang", d.soDauThang],
+                          ["soTuanTruoc", d.soTuanTruoc],
+                        ] as [keyof Metric, number][]
+                      ).map(([field, value]) => (
                         <td
-                          key={vi}
+                          key={field}
                           className="mono"
                           style={{
                             padding: "9px 12px",
                             fontSize: 12,
                             textAlign: "right",
-                            color: diffColor(v),
+                            color: diffColor(value),
                             fontWeight: 600,
                           }}
                         >
-                          {v >= 0 ? "+" : ""}
-                          {fmt1(v)}
+                          {value >= 0 ? "+" : ""}
+                          {fmt1(value)}
                         </td>
                       ))}
                       <td style={{ padding: "9px 12px", textAlign: "right" }}>
@@ -2043,11 +2106,11 @@ function SingleReportTable({
   rows,
   pageTitle,
   isPortrait = true,
-}: {
+}: Readonly<{
   rows: ReportRow[]
   pageTitle?: string
   isPortrait?: boolean
-}) {
+}>) {
   const border = "1px solid #000000"
   const baseCell: React.CSSProperties = {
     border,
@@ -2075,46 +2138,50 @@ function SingleReportTable({
   }
 
   const headers = [
-    { label: "Tên", width: "5.8%", align: "center" as const },
-    { label: "HDV ĐK", width: "4.95%", align: "center" as const },
-    { label: "HDV KH", width: "4.95%", align: "center" as const },
+    { id: "hdv-name", label: "Tên", width: "5.8%", align: "center" as const },
+    { id: "hdv-dk", label: "HDV ĐK", width: "4.95%", align: "center" as const },
+    { id: "hdv-kh", label: "HDV KH", width: "4.95%", align: "center" as const },
     {
+      id: "hdv-growth",
       label: "Giao\ntăng (*)",
       width: "4.95%",
       align: "center" as const,
       color: "#d90099",
     },
-    { label: "HĐV TH", width: "4.95%", align: "center" as const },
-    { label: "Còn TH\nHĐV", width: "4.95%", align: "center" as const },
-    { label: "'+/- so\nĐK", width: "4.95%", align: "center" as const },
-    { label: "'+/- so\nĐầu\ntháng", width: "4.95%", align: "center" as const },
+    { id: "hdv-actual", label: "HĐV TH", width: "4.95%", align: "center" as const },
+    { id: "hdv-remaining", label: "Còn TH\nHĐV", width: "4.95%", align: "center" as const },
+    { id: "hdv-vs-plan", label: "'+/- so\nĐK", width: "4.95%", align: "center" as const },
+    { id: "hdv-vs-month", label: "'+/- so\nĐầu\ntháng", width: "4.95%", align: "center" as const },
     {
+      id: "hdv-vs-week",
       label: "'+/- so\ntuần\ntrước",
       width: "4.95%",
       align: "center" as const,
       bg: "#ffff00",
     },
-    { label: "% HT", width: "4.4%", align: "center" as const },
-    { label: "TD ĐK", width: "4.95%", align: "center" as const },
-    { label: "TD KH", width: "4.95%", align: "center" as const },
+    { id: "hdv-pct", label: "% HT", width: "4.4%", align: "center" as const },
+    { id: "td-dk", label: "TD ĐK", width: "4.95%", align: "center" as const },
+    { id: "td-kh", label: "TD KH", width: "4.95%", align: "center" as const },
     {
+      id: "td-growth",
       label: "Giao\ntăng (*)",
       width: "4.95%",
       align: "center" as const,
       color: "#d90099",
     },
-    { label: "TD TH", width: "4.95%", align: "center" as const, bg: "#ffff00" },
-    { label: "Còn\nTHTD", width: "4.95%", align: "center" as const },
-    { label: "'+/- so\nĐK", width: "4.95%", align: "center" as const },
-    { label: "'+/- so\nĐầu\ntháng", width: "4.95%", align: "center" as const },
+    { id: "td-actual", label: "TD TH", width: "4.95%", align: "center" as const, bg: "#ffff00" },
+    { id: "td-remaining", label: "Còn\nTHTD", width: "4.95%", align: "center" as const },
+    { id: "td-vs-plan", label: "'+/- so\nĐK", width: "4.95%", align: "center" as const },
+    { id: "td-vs-month", label: "'+/- so\nĐầu\ntháng", width: "4.95%", align: "center" as const },
     {
+      id: "td-vs-week",
       label: "'+/- so\ntuần\ntrước",
       width: "4.95%",
       align: "center" as const,
       bg: "#ffff00",
     },
-    { label: "% HT", width: "4.4%", align: "center" as const },
-    { label: "Tên", width: "5.8%", align: "center" as const },
+    { id: "td-pct", label: "% HT", width: "4.4%", align: "center" as const },
+    { id: "td-name", label: "Tên", width: "5.8%", align: "center" as const },
   ]
 
   const renderMetric = (m: Metric, prefix: string, kind: ReportRow["kind"]) => {
@@ -2123,14 +2190,9 @@ function SingleReportTable({
     const isTot = kind === "total"
     const isSummary = isUnit || isMgr || isTot
 
-    const rowBg = isTot
-      ? "#ffff00"
-      : isMgr
-        ? "#088f8f"
-        : isUnit
-          ? "#00b074"
-          : undefined
-    const rowColor = isTot ? "#075b64" : isSummary ? "#ffffff" : undefined
+    const rowColors = getReportRowColors(kind)
+    const rowBg = rowColors.background
+    const rowColor = rowColors.color
 
     // Values: 0:dk, 1:kh, 2:giaoTang, 3:th, 4:conTh, 5:soDk, 6:soDauThang, 7:soTuanTruoc
     const vals = [
@@ -2215,15 +2277,15 @@ function SingleReportTable({
         }}
       >
         <colgroup>
-          {headers.map((h, i) => (
-            <col key={i} style={{ width: h.width }} />
+          {headers.map((h) => (
+            <col key={h.id} style={{ width: h.width }} />
           ))}
         </colgroup>
         <thead>
           <tr style={{ background: "#ffffff" }}>
-            {headers.map((h, i) => (
+            {headers.map((h) => (
               <th
-                key={i}
+                key={h.id}
                 style={{
                   ...baseCell,
                   textAlign: "center",
@@ -2249,22 +2311,13 @@ function SingleReportTable({
             const isTot = row.kind === "total"
             const isSummary = isUnit || isMgr || isTot
 
-            const rowBg = isTot
-              ? "#ffff00"
-              : isMgr
-                ? "#088f8f"
-                : isUnit
-                  ? "#00b074"
-                  : undefined
-            const rowColor = isTot
-              ? "#075b64"
-              : isSummary
-                ? "#ffffff"
-                : undefined
+            const rowColors = getReportRowColors(row.kind)
+            const rowBg = rowColors.background
+            const rowColor = rowColors.color
 
             return (
               <tr
-                key={`row-${rIdx}-${row.name}`}
+                key={`${row.kind}-${row.code?.trim() || row.name}-${row.unit}-${row.fullName}`}
                 style={rowBg ? { background: rowBg } : undefined}
               >
                 <td
@@ -2336,17 +2389,31 @@ function splitPages(
   return { page1: p1, page2: p2, page3: p3 }
 }
 
+function getPrintButtonLabel(
+  printScope: "all" | "current",
+  orientation: "portrait" | "landscape",
+) {
+  if (printScope === "all") {
+    return orientation === "portrait"
+      ? "In khổ dọc (3 trang)"
+      : "In khổ ngang (3 trang)"
+  }
+  return orientation === "portrait"
+    ? "In trang đang xem (Khổ dọc)"
+    : "In trang đang xem (Khổ ngang)"
+}
+
 // ── XUẤT PDF PAGE ─────────────────────────────────────────────────────────────
 
 function XuatPDFPage({
   rows,
   sourceName,
   onUploadExcel,
-}: {
+}: Readonly<{
   rows: ReportRow[]
   sourceName: string
   onUploadExcel: (e: React.ChangeEvent<HTMLInputElement>) => void
-}) {
+}>) {
   const [pageView, setPageView] = useState<"all" | "page1" | "page2" | "page3">(
     "all",
   )
@@ -2700,6 +2767,7 @@ function XuatPDFPage({
               width="14"
               height="14"
               viewBox="0 0 24 24"
+              aria-hidden="true"
               fill="none"
               stroke="currentColor"
               strokeWidth="2.5"
@@ -2743,6 +2811,7 @@ function XuatPDFPage({
               width="16"
               height="16"
               viewBox="0 0 24 24"
+              aria-hidden="true"
               fill="none"
               stroke="currentColor"
               strokeWidth="2.5"
@@ -2751,13 +2820,7 @@ function XuatPDFPage({
               <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
               <rect x="6" y="14" width="12" height="8" />
             </svg>
-            {printScope === "all"
-              ? orientation === "portrait"
-                ? "In khổ dọc (3 trang)"
-                : "In khổ ngang (3 trang)"
-              : orientation === "portrait"
-                ? "In trang đang xem (Khổ dọc)"
-                : "In trang đang xem (Khổ ngang)"}
+            {getPrintButtonLabel(printScope, orientation)}
           </button>
         </div>
       </div>
@@ -2833,6 +2896,7 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
         width="16"
         height="16"
         viewBox="0 0 24 24"
+        aria-hidden="true"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -2852,6 +2916,7 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
         width="16"
         height="16"
         viewBox="0 0 24 24"
+        aria-hidden="true"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -2871,6 +2936,7 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
         width="16"
         height="16"
         viewBox="0 0 24 24"
+        aria-hidden="true"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -2887,6 +2953,7 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
         width="16"
         height="16"
         viewBox="0 0 24 24"
+        aria-hidden="true"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -2905,6 +2972,7 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
         width="16"
         height="16"
         viewBox="0 0 24 24"
+        aria-hidden="true"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -2919,7 +2987,10 @@ const NAV: { id: Page; label: string; icon: React.ReactElement }[] = [
   },
 ]
 
-function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
+function Sidebar({
+  page,
+  setPage,
+}: Readonly<{ page: Page; setPage: (p: Page) => void }>) {
   return (
     <aside
       className="no-print"
@@ -3008,7 +3079,7 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
                 <span style={{ opacity: isActive ? 1 : 0.75 }}>
                   {item.icon}
                 </span>
-                {item.label}
+                {" "}{item.label}
               </button>
             )
           })}
@@ -3035,23 +3106,26 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) 
 function LoginScreen({
   onLogin,
   backendConfigured,
-}: {
+}: Readonly<{
   onLogin: (
     email: string,
     password: string,
     remember: boolean,
   ) => Promise<string | null>
   backendConfigured: boolean
-}) {
+}>) {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
-    const email = String(formData.get("email") ?? "").trim().toLowerCase()
-    const password = String(formData.get("password") ?? "")
+    const emailValue = formData.get("email")
+    const passwordValue = formData.get("password")
+    const email =
+      typeof emailValue === "string" ? emailValue.trim().toLowerCase() : ""
+    const password = typeof passwordValue === "string" ? passwordValue : ""
     const remember = formData.get("remember") === "on"
 
     if (!password) {
@@ -3088,7 +3162,7 @@ function LoginScreen({
         <div className="login-showcase__content">
           <span className="login-eyebrow">
             <span className="login-eyebrow__dot" />
-            KHÔNG GIAN LÀM VIỆC SỐ
+            <span>KHÔNG GIAN LÀM VIỆC SỐ</span>
           </span>
           <h1>
             Số liệu rõ ràng.
@@ -3240,17 +3314,17 @@ function LoginScreen({
               <span className="login-remember__box" aria-hidden="true">
                 <svg viewBox="0 0 16 16"><path d="m3 8 3.2 3.2L13 4.5" /></svg>
               </span>
-              Ghi nhớ đăng nhập
+              <span>Ghi nhớ đăng nhập</span>
             </label>
 
             {message && (
-              <p className="login-message" role="status">
+              <output className="login-message">
                 <svg viewBox="0 0 20 20" aria-hidden="true">
                   <circle cx="10" cy="10" r="7.5" />
                   <path d="M10 6v4m0 3h.01" />
                 </svg>
                 {message}
-              </p>
+              </output>
             )}
 
             {!backendConfigured && (
@@ -3584,13 +3658,14 @@ export default function App() {
     source.forEach(({ member }) => {
       nameCounts.set(member.name, (nameCounts.get(member.name) ?? 0) + 1)
     })
-    return source.map(({ member, index }) => ({
-      id: getMemberId(member, index),
-      label:
+    return source.map(({ member, index }) => {
+      const codeSuffix = member.code ? ` (${member.code})` : ""
+      const label =
         (nameCounts.get(member.name) ?? 0) > 1
-          ? `${member.name} — ${member.fullName}${member.code ? ` (${member.code})` : ""}`
-          : member.name,
-    }))
+          ? `${member.name} — ${member.fullName}${codeSuffix}`
+          : member.name
+      return { id: getMemberId(member, index), label }
+    })
   }, [members, selectedDonVi])
 
   const filteredMembers = useMemo(() => {
@@ -3759,7 +3834,7 @@ export default function App() {
                 onChange={handleExcelUpload}
                 style={{ display: "none" }}
               />
-              Nạp Excel
+              <span>Nạp Excel</span>
             </label>
 
             <FilterBar
@@ -3825,6 +3900,7 @@ export default function App() {
                 width="14"
                 height="14"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2.2"
@@ -3839,9 +3915,9 @@ export default function App() {
         </header>
 
         {storageWarning && (
-          <div
-            role="status"
+          <output
             style={{
+              display: "block",
               padding: "10px 24px",
               color: "#854d0e",
               background: "#fefce8",
@@ -3850,7 +3926,7 @@ export default function App() {
             }}
           >
             {storageWarning}
-          </div>
+          </output>
         )}
 
         {/* Main Content Area */}
@@ -3915,14 +3991,17 @@ export default function App() {
             background: "rgba(15, 23, 42, 0.55)",
           }}
         >
-          <section
-            role="dialog"
+          <dialog
+            open
             aria-modal="true"
             aria-labelledby="excel-preview-title"
             style={{
+              position: "relative",
+              margin: 0,
               width: "min(540px, 100%)",
               maxHeight: "min(85vh, 700px)",
               overflowY: "auto",
+              border: 0,
               borderRadius: 14,
               padding: 24,
               background: "#fff",
@@ -4038,7 +4117,7 @@ export default function App() {
                 {isConfirmingImport ? "Đang lưu và nạp..." : "Xác nhận nạp"}
               </button>
             </div>
-          </section>
+          </dialog>
         </div>
       )}
     </div>

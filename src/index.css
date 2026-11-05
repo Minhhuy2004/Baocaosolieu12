@@ -58,6 +58,23 @@ html, body {
   background: #eef2f7;
 }
 
+.page-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-nav-toggle,
+.mobile-nav-list {
+  display: none;
+}
+
+.mobile-nav-toggle:focus-visible,
+.mobile-nav-item:focus-visible {
+  outline: 3px solid #fdb71a;
+  outline-offset: 2px;
+}
+
 /* Print portal: ẩn trên màn hình, chỉ hiện khi in */
 .print-portal {
   display: none;
@@ -725,6 +742,71 @@ html, body {
 }
 
 @media (max-width: 680px) {
+  .app-shell {
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .mobile-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    padding: 8px 10px;
+    border: 1px solid #005b57;
+    border-radius: 7px;
+    background: #004845;
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .mobile-nav-list {
+    flex-direction: column;
+    gap: 4px;
+    max-height: min(50dvh, 320px);
+    overflow-y: auto;
+    padding: 6px;
+    border: 1px solid #d5e5e3;
+    border-radius: 9px;
+    background: #f6faf9;
+  }
+
+  .mobile-nav-list.is-open {
+    display: flex;
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 0;
+    border-left: 3px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: #285d59;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mobile-nav-item.is-active {
+    border-left-color: #fdb71a;
+    background: #004845;
+    color: #fff;
+  }
+
   .login-screen {
     display: block;
     min-height: 100vh;

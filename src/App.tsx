@@ -2993,7 +2993,7 @@ function Sidebar({
 }: Readonly<{ page: Page; setPage: (p: Page) => void }>) {
   return (
     <aside
-      className="no-print"
+      className="app-sidebar no-print"
       style={{
         width: 225,
         background: "#004845",
@@ -3367,6 +3367,7 @@ function LoginScreen({
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [isPagePending, startPageTransition] = useTransition()
   const mainContentRef = useRef<HTMLElement>(null)
   const [selectedDonVi, setSelectedDonVi] = useState("Tất cả")
@@ -3716,7 +3717,10 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <div
+      className="app-shell"
+      style={{ display: "flex", height: "100vh", overflow: "hidden" }}
+    >
       {/* Sidebar nhận diện thương hiệu BIDV */}
       <Sidebar page={page} setPage={navigateToPage} />
 
@@ -3817,7 +3821,38 @@ export default function App() {
               flexWrap: "wrap",
             }}
           >
-            <div>
+            <div className="page-heading">
+              <button
+                type="button"
+                className="mobile-nav-toggle"
+                aria-expanded={isMobileNavOpen}
+                aria-controls="mobile-function-list"
+                aria-label={
+                  isMobileNavOpen
+                    ? "Đóng danh sách chức năng"
+                    : "Mở danh sách chức năng"
+                }
+                onClick={() => setIsMobileNavOpen((open) => !open)}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  fill="currentColor"
+                >
+                  <circle cx="5" cy="5" r="2" />
+                  <circle cx="12" cy="5" r="2" />
+                  <circle cx="19" cy="5" r="2" />
+                  <circle cx="5" cy="12" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="19" cy="12" r="2" />
+                  <circle cx="5" cy="19" r="2" />
+                  <circle cx="12" cy="19" r="2" />
+                  <circle cx="19" cy="19" r="2" />
+                </svg>
+                <span>Chức năng</span>
+              </button>
               <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>
                 {page === "dashboard" && "Tổng quan số liệu"}
                 {page === "bieudo" && "Biểu đồ phân tích"}
@@ -3910,6 +3945,31 @@ export default function App() {
               units={units}
             />
           </div>
+
+          <nav
+            id="mobile-function-list"
+            className={`mobile-nav-list${isMobileNavOpen ? " is-open" : ""}`}
+            aria-label="Chức năng"
+          >
+            {NAV.map((item) => {
+              const isActive = page === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`mobile-nav-item${isActive ? " is-active" : ""}`}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => {
+                    navigateToPage(item.id)
+                    setIsMobileNavOpen(false)
+                  }}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.label}
+                </button>
+              )
+            })}
+          </nav>
         </header>
 
         {storageWarning && (

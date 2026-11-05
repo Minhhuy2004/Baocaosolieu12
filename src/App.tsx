@@ -3734,39 +3734,103 @@ export default function App() {
           style={{
             background: "#fff",
             borderBottom: "1px solid #e2e8f0",
-            padding: "12px 24px",
+            padding: "10px 24px",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+            flexDirection: "column",
+            alignItems: "stretch",
             flexShrink: 0,
-            flexWrap: "wrap",
-            gap: 12,
+            gap: 10,
           }}
         >
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>
-              {page === "dashboard" && "Tổng quan số liệu"}
-              {page === "bieudo" && "Biểu đồ phân tích"}
-              {page === "solieu" && "Bảng số liệu chi tiết"}
-              {page === "theodoi" && "Theo dõi báo cáo"}
-              {page === "xuatpdf" && "Mẫu xuất báo cáo PDF"}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 999,
+                padding: "6px 10px",
+                color: "#0f172a",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              <span
+                style={{
+                  width: 24,
+                  height: 24,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "50%",
+                  background: "#dbeafe",
+                  color: "#1d4ed8",
+                  fontSize: 11,
+                }}
+              >
+                {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : "U"}
+              </span>
+              <span>{currentUserEmail || "Tài khoản"}</span>
             </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 1 }}>
-              {filteredMembers.length} CBKH ·{" "}
-              {selectedDonVi !== "Tất cả" ? selectedDonVi : "Tất cả đơn vị"} ·{" "}
-              {sourceName}
-            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                border: "1px solid #fecaca",
+                background: "#fff1f2",
+                color: "#b91c1c",
+                borderRadius: 7,
+                padding: "7px 12px",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              Đăng xuất
+            </button>
           </div>
 
           <div
             style={{
               display: "flex",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 12,
               flexWrap: "wrap",
-              marginLeft: "auto",
             }}
           >
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>
+                {page === "dashboard" && "Tổng quan số liệu"}
+                {page === "bieudo" && "Biểu đồ phân tích"}
+                {page === "solieu" && "Bảng số liệu chi tiết"}
+                {page === "theodoi" && "Theo dõi báo cáo"}
+                {page === "xuatpdf" && "Mẫu xuất báo cáo PDF"}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 1 }}>
+                {filteredMembers.length} CBKH ·{" "}
+                {selectedDonVi !== "Tất cả" ? selectedDonVi : "Tất cả đơn vị"} ·{" "}
+                {sourceName}
+              </div>
+            </div>
             {importSuccess && (
               <span
                 style={{
@@ -3845,72 +3909,6 @@ export default function App() {
               availableCBKH={availableCBKH}
               units={units}
             />
-
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                borderRadius: 999,
-                padding: "6px 10px",
-                color: "#0f172a",
-                fontSize: 12,
-                fontWeight: 700,
-                marginLeft: 8,
-              }}
-            >
-              <span
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "50%",
-                  background: "#dbeafe",
-                  color: "#1d4ed8",
-                  fontSize: 11,
-                }}
-              >
-                {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : "U"}
-              </span>
-              <span>{currentUserEmail || "Tài khoản"}</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                border: "1px solid #fecaca",
-                background: "#fff1f2",
-                color: "#b91c1c",
-                borderRadius: 7,
-                padding: "7px 12px",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <path d="M16 17l5-5-5-5" />
-                <path d="M21 12H9" />
-              </svg>
-              Đăng xuất
-            </button>
           </div>
         </header>
 

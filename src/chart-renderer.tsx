@@ -2,14 +2,15 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
+  Rectangle,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts"
+import type { ComponentProps } from "react"
 
 type ChartDatum = {
   name: string
@@ -25,17 +26,17 @@ type DashboardDatum = {
 }
 
 type ChartTooltipProps = {
-  active?: boolean
-  payload?: { name: string; value: number; color: string }[]
-  label?: string
+  readonly active?: boolean
+  readonly payload?: readonly { name: string; value: number; color: string }[]
+  readonly label?: string
 }
 
 type BieuDoChartProps = {
-  kind: "compare" | "unit" | "conth" | "perday"
-  data?: ChartDatum[]
-  actualFill?: string
-  groupByUnit?: boolean
-  average?: number
+  readonly kind: "compare" | "unit" | "conth" | "perday"
+  readonly data?: ChartDatum[]
+  readonly actualFill?: string
+  readonly groupByUnit?: boolean
+  readonly average?: number
 }
 
 function formatNumber(value: unknown): string {
@@ -54,6 +55,23 @@ function barColor(value: unknown, average: unknown): string {
   if (v > a * 1.5) return "#dc2626"
   if (v > a) return "#d97706"
   return "#059669"
+}
+
+type ColoredBarShapeProps = ComponentProps<typeof Rectangle> & {
+  payload?: ChartDatum
+  dataKey: string
+  average: number
+}
+
+function ColoredBarShape({
+  payload,
+  dataKey,
+  average,
+  ...props
+}: ColoredBarShapeProps) {
+  return (
+    <Rectangle {...props} fill={barColor(payload?.[dataKey], average)} />
+  )
 }
 
 function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
@@ -114,10 +132,10 @@ export function DashboardChart({
   data = [],
   actualFill = "#005855",
 }: {
-  data?: DashboardDatum[]
-  actualFill?: string
+  readonly data?: DashboardDatum[]
+  readonly actualFill?: string
 }) {
-  if (!data || !data.length) {
+  if (!data?.length) {
     return (
       <div
         style={{
@@ -163,6 +181,61 @@ export function DashboardChart({
   )
 }
 
+function renderCompareChart(
+  kind: "compare" | "unit",
+  data: ChartDatum[],
+  actualFill: string,
+) {
+  return (
+    <ResponsiveContainer width="100%" height={340}>
+      <BarChart
+        data={data}
+        margin={{
+          left: 0,
+          right: 16,
+          ...(kind === "compare" ? { bottom: 20 } : {}),
+        }}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis
+          dataKey="name"
+          tick={{
+            fontSize: kind === "unit" ? 12 : 11,
+            fill: "#64748b",
+            ...(kind === "unit" ? { fontWeight: 600 } : {}),
+          }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{
+            fontSize: 11,
+            fill: "#64748b",
+            fontFamily: "JetBrains Mono",
+          }}
+          axisLine={false}
+          tickLine={false}
+          width={50}
+        />
+        <Tooltip content={<ChartTooltip />} />
+        <Legend wrapperStyle={{ fontSize: 12 }} />
+        {kind === "compare" ? (
+          <>
+            <Bar dataKey="ĐK" fill="#7ecbc9" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="KH" fill="#006b68" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="TH" fill={actualFill} radius={[3, 3, 0, 0]} />
+          </>
+        ) : (
+          <>
+            <Bar dataKey="KH" fill="#7ecbc9" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="TH" fill={actualFill} radius={[3, 3, 0, 0]} />
+          </>
+        )}
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
 export function BieuDoChart({
   kind,
   data = [],
@@ -170,7 +243,7 @@ export function BieuDoChart({
   groupByUnit = false,
   average = 0,
 }: BieuDoChartProps) {
-  if (!data || !data.length) {
+  if (!data?.length) {
     return (
       <div
         style={{
@@ -187,54 +260,7 @@ export function BieuDoChart({
   }
 
   if (kind === "compare" || kind === "unit") {
-    return (
-      <ResponsiveContainer width="100%" height={340}>
-        <BarChart
-          data={data}
-          margin={{
-            left: 0,
-            right: 16,
-            ...(kind === "compare" ? { bottom: 20 } : {}),
-          }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis
-            dataKey="name"
-            tick={{
-              fontSize: kind === "unit" ? 12 : 11,
-              fill: "#64748b",
-              ...(kind === "unit" ? { fontWeight: 600 } : {}),
-            }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{
-              fontSize: 11,
-              fill: "#64748b",
-              fontFamily: "JetBrains Mono",
-            }}
-            axisLine={false}
-            tickLine={false}
-            width={50}
-          />
-          <Tooltip content={<ChartTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          {kind === "compare" ? (
-            <>
-              <Bar dataKey="ĐK" fill="#7ecbc9" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="KH" fill="#006b68" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="TH" fill={actualFill} radius={[3, 3, 0, 0]} />
-            </>
-          ) : (
-            <>
-              <Bar dataKey="KH" fill="#7ecbc9" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="TH" fill={actualFill} radius={[3, 3, 0, 0]} />
-            </>
-          )}
-        </BarChart>
-      </ResponsiveContainer>
-    )
+    return renderCompareChart(kind, data, actualFill)
   }
 
   const dataKey = kind === "conth" ? "Còn TH" : "Tỷ/ngày"
@@ -311,14 +337,12 @@ export function BieuDoChart({
             fontWeight: 700,
           }}
         />
-        <Bar dataKey={dataKey} radius={[0, 4, 4, 0]} maxBarSize={20}>
-          {data.map((item, index) => (
-            <Cell
-              key={`${kind}-cell-${index}`}
-              fill={barColor(item[dataKey], average)}
-            />
-          ))}
-        </Bar>
+        <Bar
+          dataKey={dataKey}
+          radius={[0, 4, 4, 0]}
+          maxBarSize={20}
+          shape={<ColoredBarShape dataKey={dataKey} average={average} />}
+        />
       </BarChart>
     </ResponsiveContainer>
   )

@@ -51,7 +51,7 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, {
               boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
             }}
           >
-            Nội dung tạm thời không khả dụng.
+            <p>Nội dung tạm thời không khả dụng.</p>
             <button
               type="button"
               onClick={() => window.location.reload()}

@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: process.env.FIGMA_DEV_SERVER_HOST || "0.0.0.0",
-      port: parseInt(process.env.PORT || "8443"),
+      port: Number.parseInt(process.env.PORT || "8443"),
       strictPort: true,
       watch: {
         ignored: ["**/.figma/**"],
@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       host: process.env.FIGMA_DEV_SERVER_HOST || "0.0.0.0",
-      port: parseInt(process.env.PORT || "8443"),
+      port: Number.parseInt(process.env.PORT || "8443"),
     },
   }
 })
@@ -81,24 +81,26 @@ type FigmaSiteConfiguration = {
 }
 
 /** Applies /.figma/make/site.json to the generated document shell. */
-function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
-  function sanitizeHtmlValue(value: string | undefined): string {
-    return value?.replace(/[^a-zA-Z0-9_-]/g, "") || ""
-  }
-  function escapeHtmlText(value: string): string {
-    return value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-  }
-  function replaceHtmlCommentSlot(
-    html: string,
-    slotName: string,
-    content: string,
-  ): string {
-    return html.replace(`<!-- ${slotName} -->`, content)
-  }
+function sanitizeHtmlValue(value: string | undefined): string {
+  return value?.replace(/[^a-zA-Z0-9_-]/g, "") || ""
+}
 
+function escapeHtmlText(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+}
+
+function replaceHtmlCommentSlot(
+  html: string,
+  slotName: string,
+  content: string,
+): string {
+  return html.replace(`<!-- ${slotName} -->`, content)
+}
+
+function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
   const title = config.title ?? "Figma Make App"
   const description = config.description ?? ""
   const favicon = config.icons?.icon ?? ""
@@ -126,12 +128,13 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
       })
     },
     generateBundle() {
-      if (!robotsTxt) return
-      ;(this as any).emitFile({
-        type: "asset",
-        fileName: "robots.txt",
-        source: robotsTxt,
-      })
+      if (robotsTxt) {
+        ;(this as any).emitFile({
+          type: "asset",
+          fileName: "robots.txt",
+          source: robotsTxt,
+        })
+      }
     },
     transformIndexHtml: {
       order: "pre",
@@ -350,7 +353,6 @@ function figmaReactRefreshBoundaryFallback(): Plugin {
         queueMicrotask(() => sendFullReload?.())
       }
 
-      return null
     },
   }
 }
